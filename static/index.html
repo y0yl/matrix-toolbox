@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>矩阵行最简化</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>矩阵行最简化</h1>
+    <p class="subtitle">支持含单参数的矩阵，逐步展示化简过程</p>
+  </header>
+
+  <section class="input-section">
+    <div class="size-row">
+      <label>行数</label>
+      <input type="number" id="rows" min="1" max="10" value="3">
+      <label>列数</label>
+      <input type="number" id="cols" min="1" max="10" value="4">
+      <button id="btn-create" class="btn btn-primary">生成矩阵</button>
+    </div>
+    <div class="param-row">
+      <label>参数名</label>
+      <input type="text" id="param" value="a" maxlength="1" class="param-input">
+      <span class="hint">（输入时可用此字母表示参数）</span>
+    </div>
+  </section>
+
+  <section class="matrix-section" id="matrix-section" style="display:none">
+    <div class="matrix-input-wrap">
+      <table id="matrix-table"></table>
+    </div>
+    <div class="action-row">
+      <button id="btn-reduce" class="btn btn-accent">开始化简</button>
+      <button id="btn-clear" class="btn btn-secondary">清空</button>
+      <button id="btn-example" class="btn btn-secondary">填入示例</button>
+    </div>
+  </section>
+
+  <section class="result-section" id="result-section" style="display:none">
+    <h2>化简步骤</h2>
+    <div id="steps-container"></div>
+  </section>
+</div>
+
+<script src="/static/script.js"></script>
+</body>
+</html>
