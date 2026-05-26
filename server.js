@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-// Fraction class
+// ============== Fraction ==============
 class Fraction {
   constructor(num, den = 1) {
     if (den === 0) { this.num = 0; this.den = 1; return; }
@@ -11,240 +11,534 @@ class Fraction {
     this.num = Number(BigInt(num) / g);
     this.den = Number(BigInt(den) / g);
   }
-
   add(f) { return new Fraction(this.num * f.den + f.num * this.den, this.den * f.den); }
   sub(f) { return new Fraction(this.num * f.den - f.num * this.den, this.den * f.den); }
   mul(f) { return new Fraction(this.num * f.num, this.den * f.den); }
   div(f) { return new Fraction(this.num * f.den, this.den * f.num); }
   neg() { return new Fraction(-this.num, this.den); }
+  abs() { return new Fraction(Math.abs(this.num), this.den); }
   isZero() { return this.num === 0; }
-
-  toString() {
-    if (this.den === 1) return String(this.num);
-    return `${this.num}/${this.den}`;
-  }
+  equals(f) { return this.num === f.num && this.den === f.den; }
+  toNumber() { return this.num / this.den; }
+  toString() { return this.den === 1 ? String(this.num) : `${this.num}/${this.den}`; }
+  toJSON() { return { num: this.num, den: this.den }; }
 }
 
 function gcd(a, b) {
-  a = a < 0n ? -a : a;
-  b = b < 0n ? -b : b;
-  while (b !== 0n) { [a, b] = [b, a % b]; }
+  a = a < 0n ? -a : a; b = b < 0n ? -b : b;
+  while (b !== 0n) [a, b] = [b, a % b];
   return a === 0n ? 1n : a;
 }
 
-// Entry: constant + coefficient * parameter
-class Entry {
-  constructor(constFrac, coeffFrac) {
-    this.c = constFrac;
-    this.p = coeffFrac;
-  }
+const F0 = () => new Fraction(0);
+const F1 = () => new Fraction(1);
+const Fn = (n) => new Fraction(n);
 
-  isZero() { return this.c.isZero() && this.p.isZero(); }
-  hasParam() { return !this.p.isZero(); }
-
-  neg() { return new Entry(this.c.neg(), this.p.neg()); }
-
-  add(e) { return new Entry(this.c.add(e.c), this.p.add(e.p)); }
-  sub(e) { return new Entry(this.c.sub(e.c), this.p.sub(e.p)); }
-
-  mulScalar(s) {
-    return new Entry(this.c.mul(s), this.p.mul(s));
-  }
-
-  toString() {
-    const cZero = this.c.isZero();
-    const pZero = this.p.isZero();
-
-    if (cZero && pZero) return '0';
-    if (pZero) return this.c.toString();
-
-    let coeffStr;
-    if (this.p.num === 1 && this.p.den === 1) coeffStr = 'a';
-    else if (this.p.num === -1 && this.p.den === 1) coeffStr = '-a';
-    else if (this.p.den === 1) coeffStr = `${this.p.num}a`;
-    else coeffStr = `(${this.p.toString()})a`;
-
-    if (cZero) return coeffStr;
-
-    return this.p.num > 0
-      ? `${this.c.toString()}+${coeffStr}`
-      : `${this.c.toString()}${coeffStr}`;
-  }
+// ============== Matrix utilities ==============
+function createMatrix(rows, cols, fill = null) {
+  return Array.from({ length: rows }, () =>
+    Array.from({ length: cols }, () => fill ? fill() : F0())
+  );
 }
 
-function zeroEntry() { return new Entry(new Fraction(0), new Fraction(0)); }
-
-function entryFromString(s) {
-  s = s.trim();
-  if (!s || s === '0') return zeroEntry();
-
-  // Find parameter character
-  let paramChar = '';
-  for (const ch of s) {
-    if (ch >= 'a' && ch <= 'z' && ch !== 'e') {
-      paramChar = ch;
-      break;
-    }
-  }
-
-  if (!paramChar) return parseNumber(s);
-
-  // Split by parameter
-  const parts = s.split(paramChar);
-  if (parts.length === 1) {
-    const t = parts[0].trim();
-    if (!t || t === '+') return new Entry(new Fraction(0), new Fraction(1));
-    if (t === '-') return new Entry(new Fraction(0), new Fraction(-1));
-    return new Entry(new Fraction(0), parseNumber(t).c);
-  }
-
-  let coeffPart = parts[0].trim();
-  let constPart = parts[1].trim();
-
-  let coeff;
-  if (!coeffPart || coeffPart === '+') coeff = new Fraction(1);
-  else if (coeffPart === '-') coeff = new Fraction(-1);
-  else coeff = parseNumber(coeffPart).c;
-
-  let cnst = new Fraction(0);
-  if (constPart) cnst = parseNumber(constPart).c;
-
-  return new Entry(cnst, coeff);
+function cloneMatrix(m) {
+  return m.map(row => [...row]);
 }
 
-function parseNumber(s) {
-  s = s.trim();
-  if (!s || s === '0') return zeroEntry();
-  if (s === '1') return new Entry(new Fraction(1), new Fraction(0));
-  if (s === '-1') return new Entry(new Fraction(-1), new Fraction(0));
+function parseNum(s) {
+  s = String(s).trim();
+  if (!s || s === '0') return F0();
+  if (s === '1') return F1();
+  if (s === '-1') return new Fraction(-1);
   if (s.includes('/')) {
-    const [num, den] = s.split('/').map(Number);
-    return new Entry(new Fraction(num, den), new Fraction(0));
+    const [n, d] = s.split('/').map(Number);
+    return new Fraction(n, d);
   }
-  return new Entry(new Fraction(Number(s)), new Fraction(0));
+  return new Fraction(Number(s));
 }
 
-// Matrix reduction
-function reduceMatrix(rows, cols, matrixData) {
-  const steps = [];
+function fracStr(f) {
+  if (f.den === 1) return String(f.num);
+  return `${f.num}/${f.den}`;
+}
 
-  function snapshot(desc, data) {
-    steps.push({
-      index: steps.length + 1,
-      desc,
-      matrix: data.map(row => row.map(e => ({
-        const: { num: e.c.num, den: e.c.den },
-        coeff: { num: e.p.num, den: e.p.den }
-      })))
-    });
-  }
+function matToJSON(m) {
+  return m.map(row => row.map(f => f.toJSON()));
+}
 
-  // Clone data
-  const data = matrixData.map(row => [...row]);
+// ============== Operations ==============
 
-  snapshot('初始矩阵', data);
+// Addition
+function matAdd(a, b) {
+  const r = a.length, c = a[0].length;
+  const res = createMatrix(r, c);
+  for (let i = 0; i < r; i++)
+    for (let j = 0; j < c; j++)
+      res[i][j] = a[i][j].add(b[i][j]);
+  return res;
+}
 
-  // Gauss-Jordan elimination
+// Subtraction
+function matSub(a, b) {
+  const r = a.length, c = a[0].length;
+  const res = createMatrix(r, c);
+  for (let i = 0; i < r; i++)
+    for (let j = 0; j < c; j++)
+      res[i][j] = a[i][j].sub(b[i][j]);
+  return res;
+}
+
+// Scalar multiplication
+function matScale(m, s) {
+  return m.map(row => row.map(f => f.mul(s)));
+}
+
+// Multiplication
+function matMul(a, b) {
+  const r = a.length, n = a[0].length, c = b[0].length;
+  const res = createMatrix(r, c);
+  for (let i = 0; i < r; i++)
+    for (let j = 0; j < c; j++)
+      for (let k = 0; k < n; k++)
+        res[i][j] = res[i][j].add(a[i][k].mul(b[k][j]));
+  return res;
+}
+
+// Transpose
+function matTranspose(m) {
+  const r = m.length, c = m[0].length;
+  const res = createMatrix(c, r);
+  for (let i = 0; i < r; i++)
+    for (let j = 0; j < c; j++)
+      res[j][i] = m[i][j];
+  return res;
+}
+
+// Trace
+function matTrace(m) {
+  const n = Math.min(m.length, m[0].length);
+  let t = F0();
+  for (let i = 0; i < n; i++) t = t.add(m[i][i]);
+  return t;
+}
+
+// Row Echelon Form (with steps)
+function matREF(m) {
+  const rows = m.length, cols = m[0].length;
+  const data = cloneMatrix(m);
+  const steps = [{ index: 1, desc: '初始矩阵', matrix: matToJSON(data) }];
+
   let pivotRow = 0;
   for (let col = 0; col < cols && pivotRow < rows; col++) {
     // Find pivot
-    let bestRow = -1;
+    let best = -1;
     for (let row = pivotRow; row < rows; row++) {
-      const e = data[row][col];
-      if (e.isZero()) continue;
-      if (!e.hasParam()) { bestRow = row; break; }
-      if (bestRow === -1) bestRow = row;
+      if (!data[row][col].isZero()) { best = row; break; }
     }
-    if (bestRow === -1) continue;
+    if (best === -1) continue;
 
     // Swap
-    if (bestRow !== pivotRow) {
-      [data[pivotRow], data[bestRow]] = [data[bestRow], data[pivotRow]];
-      snapshot(`交换第${pivotRow + 1}行和第${bestRow + 1}行`, data);
+    if (best !== pivotRow) {
+      [data[pivotRow], data[best]] = [data[best], data[pivotRow]];
+      steps.push({ index: steps.length + 1, desc: `交换第${pivotRow + 1}行和第${best + 1}行`, matrix: matToJSON(data) });
     }
 
-    // Scale pivot row
+    // Scale pivot
     const pivot = data[pivotRow][col];
-    if (!pivot.isZero()) {
-      let needScale = false;
-      if (pivot.hasParam()) {
-        needScale = pivot.p.num !== 1 || pivot.p.den !== 1;
-      } else {
-        needScale = pivot.c.num !== 1 || pivot.c.den !== 1;
-      }
-
-      if (needScale) {
-        let inv;
-        if (!pivot.hasParam()) {
-          inv = new Fraction(pivot.c.den, pivot.c.num);
-          for (let j = col; j < cols; j++) {
-            data[pivotRow][j] = new Entry(
-              data[pivotRow][j].c.mul(inv),
-              data[pivotRow][j].p.mul(inv)
-            );
-          }
-          snapshot(`第${pivotRow + 1}行 × ${inv.toString()}`, data);
-        } else {
-          inv = new Fraction(pivot.p.den, pivot.p.num);
-          for (let j = col; j < cols; j++) {
-            data[pivotRow][j] = new Entry(
-              data[pivotRow][j].c.mul(inv),
-              data[pivotRow][j].p.mul(inv)
-            );
-          }
-          snapshot(`第${pivotRow + 1}行 × ${inv.toString()} (使a的系数为1)`, data);
-        }
-      }
+    if (!pivot.equals(F1())) {
+      for (let j = col; j < cols; j++) data[pivotRow][j] = data[pivotRow][j].div(pivot);
+      steps.push({ index: steps.length + 1, desc: `第${pivotRow + 1}行 × ${fracStr(new Fraction(pivot.den, pivot.num))}`, matrix: matToJSON(data) });
     }
 
-    // Eliminate other rows
+    // Eliminate below
+    for (let row = pivotRow + 1; row < rows; row++) {
+      const factor = data[row][col];
+      if (factor.isZero()) continue;
+      for (let j = col; j < cols; j++)
+        data[row][j] = data[row][j].sub(factor.mul(data[pivotRow][j]));
+      steps.push({ index: steps.length + 1, desc: `第${row + 1}行 - (${fracStr(factor)})×第${pivotRow + 1}行`, matrix: matToJSON(data) });
+    }
+    pivotRow++;
+  }
+  return { result: data, steps };
+}
+
+// Reduced Row Echelon Form (with steps)
+function matRREF(m) {
+  const rows = m.length, cols = m[0].length;
+  const data = cloneMatrix(m);
+  const steps = [{ index: 1, desc: '初始矩阵', matrix: matToJSON(data) }];
+
+  let pivotRow = 0;
+  for (let col = 0; col < cols && pivotRow < rows; col++) {
+    let best = -1;
+    for (let row = pivotRow; row < rows; row++) {
+      if (!data[row][col].isZero()) { best = row; break; }
+    }
+    if (best === -1) continue;
+
+    if (best !== pivotRow) {
+      [data[pivotRow], data[best]] = [data[best], data[pivotRow]];
+      steps.push({ index: steps.length + 1, desc: `交换第${pivotRow + 1}行和第${best + 1}行`, matrix: matToJSON(data) });
+    }
+
+    const pivot = data[pivotRow][col];
+    if (!pivot.equals(F1())) {
+      for (let j = col; j < cols; j++) data[pivotRow][j] = data[pivotRow][j].div(pivot);
+      steps.push({ index: steps.length + 1, desc: `第${pivotRow + 1}行 × ${fracStr(new Fraction(pivot.den, pivot.num))}`, matrix: matToJSON(data) });
+    }
+
+    // Eliminate all other rows
     for (let row = 0; row < rows; row++) {
       if (row === pivotRow) continue;
       const factor = data[row][col];
       if (factor.isZero()) continue;
-
-      for (let j = col; j < cols; j++) {
-        // row_j = row_j - factor * pivotRow_j
-        // factor is a value, we need to multiply it with pivot row entry
-        // For entries with params, this is complex. Simplify:
-        // If factor has no param: straightforward scalar multiplication
-        // If factor has param: we treat it as scalar (constant part) for elimination
-        // This works for standard row reduction where we eliminate using the pivot
-
-        let subVal;
-        if (!factor.hasParam()) {
-          // Pure number factor
-          subVal = data[pivotRow][j].mulScalar(factor.c);
-        } else {
-          // Has param - multiply (c_f + p_f*a) * entry
-          // This gets complex with a^2 terms. For linear algebra, we assume
-          // the matrix entries are linear in 'a', so we do the multiplication
-          // treating 'a' as an algebraic variable
-          const e = data[pivotRow][j];
-          // (c_f + p_f*a)(c_e + p_e*a) = c_f*c_e + (c_f*p_e + p_f*c_e)*a + p_f*p_e*a^2
-          // For linear systems, we ignore a^2 (assume it doesn't arise or is handled separately)
-          // This is correct for standard row reduction of parametric matrices
-          const cc = factor.c.mul(e.c);
-          const cp = factor.c.mul(e.p).add(factor.p.mul(e.c));
-          subVal = new Entry(cc, cp);
-        }
-        data[row][j] = data[row][j].sub(subVal);
-      }
-      snapshot(`第${row + 1}行 - (${factor.toString()})×第${pivotRow + 1}行`, data);
+      for (let j = col; j < cols; j++)
+        data[row][j] = data[row][j].sub(factor.mul(data[pivotRow][j]));
+      steps.push({ index: steps.length + 1, desc: `第${row + 1}行 - (${fracStr(factor)})×第${pivotRow + 1}行`, matrix: matToJSON(data) });
     }
-
     pivotRow++;
   }
-
-  return steps;
+  return { result: data, steps };
 }
 
-// HTTP server
+// Determinant (with steps, cofactor expansion)
+function matDet(m) {
+  const n = m.length;
+  if (n !== m[0].length) return { result: null, steps: [], error: '行列式要求方阵' };
+
+  const steps = [];
+
+  function det(mat, depth) {
+    const sz = mat.length;
+    if (sz === 1) return { val: mat[0][0], steps: [] };
+
+    if (sz === 2) {
+      const val = mat[0][0].mul(mat[1][1]).sub(mat[0][1].mul(mat[1][0]));
+      return { val, steps: [] };
+    }
+
+    let result = F0();
+    const subSteps = [];
+
+    for (let j = 0; j < sz; j++) {
+      const sign = j % 2 === 0 ? 1 : -1;
+      const coeff = sign === 1 ? mat[0][j] : mat[0][j].neg();
+      if (coeff.isZero()) continue;
+
+      // Build minor
+      const minor = [];
+      for (let r = 1; r < sz; r++) {
+        const row = [];
+        for (let c = 0; c < sz; c++) {
+          if (c !== j) row.push(mat[r][c]);
+        }
+        minor.push(row);
+      }
+
+      const { val: minorVal } = det(minor, depth + 1);
+      const term = coeff.mul(minorVal);
+      result = result.add(term);
+    }
+
+    return { val: result, steps: subSteps };
+  }
+
+  // Use row reduction for determinant (more efficient with steps)
+  const data = cloneMatrix(m);
+  let swapCount = 0;
+  let scaleProduct = F1();
+
+  steps.push({ index: 1, desc: '初始矩阵', matrix: matToJSON(data) });
+
+  for (let i = 0; i < n; i++) {
+    // Find pivot
+    let best = -1;
+    for (let row = i; row < n; row++) {
+      if (!data[row][i].isZero()) { best = row; break; }
+    }
+    if (best === -1) {
+      return { result: F0(), steps: [...steps, { index: steps.length + 1, desc: '存在全零列，行列式 = 0', matrix: matToJSON(data) }] };
+    }
+
+    if (best !== i) {
+      [data[i], data[best]] = [data[best], data[i]];
+      swapCount++;
+      steps.push({ index: steps.length + 1, desc: `交换第${i + 1}行和第${best + 1}行 (符号变号)`, matrix: matToJSON(data) });
+    }
+
+    const pivot = data[i][i];
+    // Don't scale - just eliminate
+
+    for (let row = i + 1; row < n; row++) {
+      const factor = data[row][i];
+      if (factor.isZero()) continue;
+      // row = row - (factor/pivot) * pivotRow
+      const ratio = factor.div(pivot);
+      for (let j = i; j < n; j++)
+        data[row][j] = data[row][j].sub(ratio.mul(data[i][j]));
+      steps.push({ index: steps.length + 1, desc: `第${row + 1}行 - (${fracStr(ratio)})×第${i + 1}行`, matrix: matToJSON(data) });
+    }
+  }
+
+  // Determinant = product of diagonal * (-1)^swaps
+  let detVal = F1();
+  for (let i = 0; i < n; i++) detVal = detVal.mul(data[i][i]);
+  if (swapCount % 2 !== 0) detVal = detVal.neg();
+
+  let desc = `对角线乘积 = ${fracStr(detVal.abs())}`;
+  if (swapCount % 2 !== 0) desc += `，交换${swapCount}次行，变号`;
+  else if (swapCount > 0) desc += `，交换${swapCount}次行，符号不变`;
+  steps.push({ index: steps.length + 1, desc, matrix: matToJSON(data) });
+
+  return { result: detVal, steps };
+}
+
+// Inverse (Gauss-Jordan with steps)
+function matInverse(m) {
+  const n = m.length;
+  if (n !== m[0].length) return { result: null, steps: [], error: '求逆要求方阵' };
+
+  // Augment [A | I]
+  const aug = createMatrix(n, 2 * n);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) aug[i][j] = m[i][j];
+    aug[i][n + i] = F1();
+  }
+
+  const steps = [{ index: 1, desc: '构造增广矩阵 [A | I]', matrix: matToJSON(aug) }];
+
+  for (let i = 0; i < n; i++) {
+    let best = -1;
+    for (let row = i; row < n; row++) {
+      if (!aug[row][i].isZero()) { best = row; break; }
+    }
+    if (best === -1) return { result: null, steps: [...steps, { index: steps.length + 1, desc: '矩阵不可逆（行列式为0）', matrix: matToJSON(aug) }], error: '矩阵不可逆' };
+
+    if (best !== i) {
+      [aug[i], aug[best]] = [aug[best], aug[i]];
+      steps.push({ index: steps.length + 1, desc: `交换第${i + 1}行和第${best + 1}行`, matrix: matToJSON(aug) });
+    }
+
+    const pivot = aug[i][i];
+    if (!pivot.equals(F1())) {
+      for (let j = 0; j < 2 * n; j++) aug[i][j] = aug[i][j].div(pivot);
+      steps.push({ index: steps.length + 1, desc: `第${i + 1}行 × ${fracStr(new Fraction(pivot.den, pivot.num))}`, matrix: matToJSON(aug) });
+    }
+
+    for (let row = 0; row < n; row++) {
+      if (row === i) continue;
+      const factor = aug[row][i];
+      if (factor.isZero()) continue;
+      for (let j = 0; j < 2 * n; j++)
+        aug[row][j] = aug[row][j].sub(factor.mul(aug[i][j]));
+      steps.push({ index: steps.length + 1, desc: `第${row + 1}行 - (${fracStr(factor)})×第${i + 1}行`, matrix: matToJSON(aug) });
+    }
+  }
+
+  // Extract inverse
+  const inv = createMatrix(n, n);
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < n; j++)
+      inv[i][j] = aug[i][n + j];
+
+  steps.push({ index: steps.length + 1, desc: '提取右侧即为逆矩阵 A⁻¹', matrix: matToJSON(inv) });
+  return { result: inv, steps };
+}
+
+// Rank (with steps)
+function matRank(m) {
+  const { result, steps } = matREF(m);
+  let rank = 0;
+  for (let i = 0; i < result.length; i++) {
+    let nonzero = false;
+    for (let j = 0; j < result[0].length; j++) {
+      if (!result[i][j].isZero()) { nonzero = true; break; }
+    }
+    if (nonzero) rank++;
+  }
+  return { result: Fn(rank), steps, refMatrix: matToJSON(result) };
+}
+
+// Adjugate (cofactor matrix transpose)
+function matAdjugate(m) {
+  const n = m.length;
+  if (n !== m[0].length) return { result: null, error: '伴随矩阵要求方阵' };
+
+  const cofactors = createMatrix(n, n);
+  const steps = [];
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      // Minor
+      const minor = [];
+      for (let r = 0; r < n; r++) {
+        if (r === i) continue;
+        const row = [];
+        for (let c = 0; c < n; c++) {
+          if (c === j) continue;
+          row.push(m[r][c]);
+        }
+        minor.push(row);
+      }
+      const { result: minorDet } = matDet(minor);
+      const sign = (i + j) % 2 === 0 ? 1 : -1;
+      cofactors[i][j] = sign === 1 ? minorDet : minorDet.neg();
+    }
+  }
+
+  steps.push({ index: 1, desc: '余子式矩阵', matrix: matToJSON(cofactors) });
+  const adj = matTranspose(cofactors);
+  steps.push({ index: 2, desc: '伴随矩阵 = 余子式矩阵的转置', matrix: matToJSON(adj) });
+
+  return { result: adj, steps };
+}
+
+// Cofactor matrix
+function matCofactor(m) {
+  const n = m.length;
+  if (n !== m[0].length) return { result: null, error: '余子式矩阵要求方阵' };
+
+  const cofactors = createMatrix(n, n);
+  const steps = [{ index: 1, desc: '初始矩阵', matrix: matToJSON(m) }];
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const minor = [];
+      for (let r = 0; r < n; r++) {
+        if (r === i) continue;
+        const row = [];
+        for (let c = 0; c < n; c++) {
+          if (c === j) continue;
+          row.push(m[r][c]);
+        }
+        minor.push(row);
+      }
+      const { result: minorDet } = matDet(minor);
+      const sign = (i + j) % 2 === 0 ? 1 : -1;
+      cofactors[i][j] = sign === 1 ? minorDet : minorDet.neg();
+    }
+  }
+
+  steps.push({ index: 2, desc: '余子式矩阵 C', matrix: matToJSON(cofactors) });
+  return { result: cofactors, steps };
+}
+
+// ============== Handler ==============
+function parseMatrix(matrix, rows, cols) {
+  const data = [];
+  let idx = 0;
+  for (let i = 0; i < rows; i++) {
+    const row = [];
+    for (let j = 0; j < cols; j++) {
+      row.push(parseNum(matrix[idx]));
+      idx++;
+    }
+    data.push(row);
+  }
+  return data;
+}
+
+function handleAPI(req, res) {
+  let body = '';
+  req.on('data', c => body += c);
+  req.on('end', () => {
+    try {
+      const input = JSON.parse(body);
+      const { op, rows, cols, matrix, rows2, cols2, matrix2, scalar } = input;
+      let response = {};
+
+      const m = matrix ? parseMatrix(matrix, rows, cols) : null;
+      const m2 = matrix2 ? parseMatrix(matrix2, rows2 || rows, cols2 || cols) : null;
+
+      switch (op) {
+        case 'rref': {
+          const r = matRREF(m);
+          response = { steps: r.steps, result: matToJSON(r.result) };
+          break;
+        }
+        case 'ref': {
+          const r = matREF(m);
+          response = { steps: r.steps, result: matToJSON(r.result) };
+          break;
+        }
+        case 'det': {
+          const r = matDet(m);
+          response = { steps: r.steps, result: r.result ? r.result.toJSON() : null, error: r.error };
+          break;
+        }
+        case 'inverse': {
+          const r = matInverse(m);
+          response = { steps: r.steps, result: r.result ? matToJSON(r.result) : null, error: r.error };
+          break;
+        }
+        case 'transpose': {
+          const r = matTranspose(m);
+          response = { steps: [{ index: 1, desc: '转置结果', matrix: matToJSON(r) }], result: matToJSON(r) };
+          break;
+        }
+        case 'multiply': {
+          if (!m2) { response = { error: '需要第二个矩阵' }; break; }
+          const r = matMul(m, m2);
+          response = { steps: [{ index: 1, desc: '乘法结果', matrix: matToJSON(r) }], result: matToJSON(r) };
+          break;
+        }
+        case 'add': {
+          if (!m2) { response = { error: '需要第二个矩阵' }; break; }
+          const r = matAdd(m, m2);
+          response = { steps: [{ index: 1, desc: '加法结果', matrix: matToJSON(r) }], result: matToJSON(r) };
+          break;
+        }
+        case 'subtract': {
+          if (!m2) { response = { error: '需要第二个矩阵' }; break; }
+          const r = matSub(m, m2);
+          response = { steps: [{ index: 1, desc: '减法结果', matrix: matToJSON(r) }], result: matToJSON(r) };
+          break;
+        }
+        case 'scalar-mul': {
+          const s = parseNum(scalar || '1');
+          const r = matScale(m, s);
+          response = { steps: [{ index: 1, desc: `${fracStr(s)} × A 的结果`, matrix: matToJSON(r) }], result: matToJSON(r) };
+          break;
+        }
+        case 'rank': {
+          const r = matRank(m);
+          response = { steps: r.steps, result: r.result.toJSON(), refMatrix: r.refMatrix };
+          break;
+        }
+        case 'trace': {
+          const r = matTrace(m);
+          response = { steps: [{ index: 1, desc: `迹 = 对角线元素之和`, matrix: matToJSON(m) }], result: r.toJSON() };
+          break;
+        }
+        case 'adjugate': {
+          const r = matAdjugate(m);
+          response = { steps: r.steps, result: r.result ? matToJSON(r.result) : null, error: r.error };
+          break;
+        }
+        case 'cofactor': {
+          const r = matCofactor(m);
+          response = { steps: r.steps, result: r.result ? matToJSON(r.result) : null, error: r.error };
+          break;
+        }
+        default:
+          response = { error: '未知操作' };
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(response));
+    } catch (err) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+  });
+}
+
+// ============== Server ==============
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
-    const filePath = path.join(__dirname, 'static', 'index.html');
-    fs.readFile(filePath, (err, data) => {
-      if (err) { res.writeHead(500); res.end('Error'); return; }
+    fs.readFile(path.join(__dirname, 'static', 'index.html'), (err, data) => {
+      if (err) { res.writeHead(500); res.end(); return; }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(data);
     });
@@ -254,59 +548,17 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url.startsWith('/static/')) {
     const filePath = path.join(__dirname, req.url);
     const ext = path.extname(filePath);
-    const mimeTypes = {
-      '.html': 'text/html',
-      '.css': 'text/css',
-      '.js': 'application/javascript',
-      '.json': 'application/json'
-    };
+    const mimes = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript' };
     fs.readFile(filePath, (err, data) => {
-      if (err) { res.writeHead(404); res.end('Not found'); return; }
-      res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'text/plain' });
+      if (err) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'Content-Type': mimes[ext] || 'text/plain' });
       res.end(data);
     });
     return;
   }
 
-  if (req.method === 'POST' && req.url === '/api/reduce') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', () => {
-      try {
-        const { rows, cols, matrix } = JSON.parse(body);
-
-        if (!rows || !cols || rows < 1 || cols < 1 || rows > 10 || cols > 10) {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: '矩阵大小需在1-10之间' }));
-          return;
-        }
-
-        if (!matrix || matrix.length !== rows * cols) {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: `需要${rows * cols}个元素` }));
-          return;
-        }
-
-        // Parse matrix
-        const data = [];
-        let idx = 0;
-        for (let i = 0; i < rows; i++) {
-          const row = [];
-          for (let j = 0; j < cols; j++) {
-            row.push(entryFromString(matrix[idx]));
-            idx++;
-          }
-          data.push(row);
-        }
-
-        const steps = reduceMatrix(rows, cols, data);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ steps }));
-      } catch (err) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: err.message }));
-      }
-    });
+  if (req.method === 'POST' && req.url === '/api/calc') {
+    handleAPI(req, res);
     return;
   }
 
@@ -315,6 +567,4 @@ const server = http.createServer((req, res) => {
 });
 
 const PORT = 6130;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://0.0.0.0:${PORT}`);
-});
+server.listen(PORT, '0.0.0.0', () => console.log(`Server on :${PORT}`));

@@ -3,45 +3,75 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>矩阵行最简化</title>
+<title>矩阵工具箱</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <div class="container">
   <header>
-    <h1>矩阵行最简化</h1>
-    <p class="subtitle">支持含单参数的矩阵，逐步展示化简过程</p>
+    <h1>矩阵工具箱</h1>
+    <p class="subtitle">矩阵运算 · 行列式 · 逐步化简</p>
   </header>
 
-  <section class="input-section">
+  <!-- Operation selector -->
+  <section class="op-section">
+    <div class="op-tabs">
+      <button class="op-tab active" data-cat="basic">基本运算</button>
+      <button class="op-tab" data-cat="transform">变换化简</button>
+      <button class="op-tab" data-cat="property">性质求解</button>
+    </div>
+    <div class="op-grid" id="op-grid"></div>
+  </section>
+
+  <!-- Matrix A input -->
+  <section class="input-section" id="section-a">
+    <h3>矩阵 A</h3>
     <div class="size-row">
-      <label>行数</label>
+      <label>行</label>
       <input type="number" id="rows" min="1" max="10" value="3">
-      <label>列数</label>
-      <input type="number" id="cols" min="1" max="10" value="4">
-      <button id="btn-create" class="btn btn-primary">生成矩阵</button>
+      <label>列</label>
+      <input type="number" id="cols" min="1" max="10" value="3">
+      <button id="btn-create" class="btn btn-primary">生成</button>
+      <button id="btn-example" class="btn btn-secondary">示例</button>
     </div>
-    <div class="param-row">
-      <label>参数名</label>
-      <input type="text" id="param" value="a" maxlength="1" class="param-input">
-      <span class="hint">（输入时可用此字母表示参数）</span>
-    </div>
-  </section>
-
-  <section class="matrix-section" id="matrix-section" style="display:none">
     <div class="matrix-input-wrap">
-      <table id="matrix-table"></table>
-    </div>
-    <div class="action-row">
-      <button id="btn-reduce" class="btn btn-accent">开始化简</button>
-      <button id="btn-clear" class="btn btn-secondary">清空</button>
-      <button id="btn-example" class="btn btn-secondary">填入示例</button>
+      <table id="matrix-a"></table>
     </div>
   </section>
 
+  <!-- Matrix B input (for binary ops) -->
+  <section class="input-section" id="section-b" style="display:none">
+    <h3>矩阵 B</h3>
+    <div class="size-row">
+      <label>行</label>
+      <input type="number" id="rows2" min="1" max="10" value="3">
+      <label>列</label>
+      <input type="number" id="cols2" min="1" max="10" value="3">
+    </div>
+    <div class="matrix-input-wrap">
+      <table id="matrix-b"></table>
+    </div>
+  </section>
+
+  <!-- Scalar input -->
+  <section class="input-section" id="section-scalar" style="display:none">
+    <h3>标量 k</h3>
+    <div class="size-row">
+      <input type="text" id="scalar-val" value="2" class="scalar-input">
+      <span class="hint">支持分数如 3/2</span>
+    </div>
+  </section>
+
+  <!-- Action -->
+  <div class="action-row">
+    <button id="btn-calc" class="btn btn-accent">计算</button>
+    <button id="btn-clear" class="btn btn-secondary">清空</button>
+  </div>
+
+  <!-- Result -->
   <section class="result-section" id="result-section" style="display:none">
-    <h2>化简步骤</h2>
-    <div id="steps-container"></div>
+    <h2 id="result-title">结果</h2>
+    <div id="result-content"></div>
   </section>
 </div>
 

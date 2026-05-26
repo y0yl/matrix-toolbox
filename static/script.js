@@ -1,35 +1,77 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const btnCreate = document.getElementById('btn-create');
-  const btnReduce = document.getElementById('btn-reduce');
-  const btnClear = document.getElementById('btn-clear');
-  const btnExample = document.getElementById('btn-example');
-  const matrixSection = document.getElementById('matrix-section');
+  // Operations config
+  const OPS = {
+    basic: [
+      { id: 'add', name: '加法 A+B', icon: '➕', needB: true },
+      { id: 'subtract', name: '减法 A-B', icon: '➖', needB: true },
+      { id: 'multiply', name: '乘法 A×B', icon: '✖️', needB: true },
+      { id: 'scalar-mul', name: '数乘 kA', icon: '🔢', needScalar: true },
+    ],
+    transform: [
+      { id: 'ref', name: '行阶梯形', icon: '📐', needSquare: false },
+      { id: 'rref', name: '行最简形', icon: '✅', needSquare: false },
+      { id: 'transpose', name: '转置 Aᵀ', icon: '↕️', needSquare: false },
+      { id: 'inverse', name: '逆矩阵', icon: '🔄', needSquare: true },
+    ],
+    property: [
+      { id: 'det', name: '行列式', icon: '📏', needSquare: true },
+      { id: 'rank', name: '秩', icon: '📊', needSquare: false },
+      { id: 'trace', name: '迹', icon: 'Σ', needSquare: true },
+      { id: 'cofactor', name: '余子式', icon: '🧮', needSquare: true },
+      { id: 'adjugate', name: '伴随矩阵', icon: '📋', needSquare: true },
+    ]
+  };
+
+  let currentOp = 'rref';
+  let currentCat = 'transform';
+
+  const opGrid = document.getElementById('op-grid');
+  const sectionA = document.getElementById('section-a');
+  const sectionB = document.getElementById('section-b');
+  const sectionScalar = document.getElementById('section-scalar');
   const resultSection = document.getElementById('result-section');
-  const matrixTable = document.getElementById('matrix-table');
-  const stepsContainer = document.getElementById('steps-container');
+  const resultTitle = document.getElementById('result-title');
+  const resultContent = document.getElementById('result-content');
 
-  let rows = 3, cols = 4;
-
-  btnCreate.addEventListener('click', createMatrix);
-  btnReduce.addEventListener('click', doReduce);
-  btnClear.addEventListener('click', clearMatrix);
-  btnExample.addEventListener('click', fillExample);
-
-  // Enter key triggers creation
-  document.getElementById('rows').addEventListener('keydown', e => {
-    if (e.key === 'Enter') createMatrix();
-  });
-  document.getElementById('cols').addEventListener('keydown', e => {
-    if (e.key === 'Enter') createMatrix();
+  // Init tabs
+  document.querySelectorAll('.op-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.op-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentCat = tab.dataset.cat;
+      renderOps();
+    });
   });
 
-  function createMatrix() {
-    rows = parseInt(document.getElementById('rows').value) || 3;
-    cols = parseInt(document.getElementById('cols').value) || 4;
-    if (rows < 1 || rows > 10) rows = 3;
-    if (cols < 1 || cols > 10) cols = 4;
+  function renderOps() {
+    const ops = OPS[currentCat];
+    opGrid.innerHTML = '';
+    ops.forEach(op => {
+      const btn = document.createElement('button');
+      btn.className = 'op-btn' + (op.id === currentOp ? ' selected' : '');
+      btn.innerHTML = `<span class="op-icon">${op.icon}</span>${op.name}`;
+      btn.addEventListener('click', () => selectOp(op));
+      opGrid.appendChild(btn);
+    });
+  }
 
-    matrixTable.innerHTML = '';
+  function selectOp(op) {
+    currentOp = op.id;
+    document.querySelectorAll('.op-btn').forEach(b => b.classList.remove('selected'));
+    event.currentTarget.classList.add('selected');
+    updateVisibility(op);
+  }
+
+  function updateVisibility(op) {
+    if (!op) op = OPS[currentCat].find(o => o.id === currentOp);
+    sectionB.style.display = op.needB ? 'block' : 'none';
+    sectionScalar.style.display = op.needScalar ? 'block' : 'none';
+  }
+
+  // Create matrix table
+  function createTable(tableId, rows, cols) {
+    const table = document.getElementById(tableId);
+    table.innerHTML = '';
     for (let i = 0; i < rows; i++) {
       const tr = document.createElement('tr');
       for (let j = 0; j < cols; j++) {
@@ -37,209 +79,195 @@ document.addEventListener('DOMContentLoaded', () => {
         const input = document.createElement('input');
         input.type = 'text';
         input.value = '0';
-        input.dataset.row = i;
-        input.dataset.col = j;
-        input.addEventListener('focus', () => {
-          if (input.value === '0') input.value = '';
-        });
-        input.addEventListener('blur', () => {
-          if (input.value.trim() === '') input.value = '0';
-        });
+        input.addEventListener('focus', () => { if (input.value === '0') input.value = ''; });
+        input.addEventListener('blur', () => { if (!input.value.trim()) input.value = '0'; });
         td.appendChild(input);
         tr.appendChild(td);
       }
-      matrixTable.appendChild(tr);
+      table.appendChild(tr);
     }
-    matrixSection.style.display = 'block';
+  }
+
+  function getMatrixValues(tableId, rows, cols) {
+    const inputs = document.getElementById(tableId).querySelectorAll('input');
+    return Array.from(inputs).map(inp => inp.value.trim() || '0');
+  }
+
+  // Buttons
+  document.getElementById('btn-create').addEventListener('click', () => {
+    const r = parseInt(document.getElementById('rows').value) || 3;
+    const c = parseInt(document.getElementById('cols').value) || 3;
+    createTable('matrix-a', r, c);
+    const r2 = parseInt(document.getElementById('rows2').value) || r;
+    const c2 = parseInt(document.getElementById('cols2').value) || c;
+    createTable('matrix-b', r2, c2);
+    updateVisibility();
+  });
+
+  document.getElementById('btn-example').addEventListener('click', () => {
+    const r = parseInt(document.getElementById('rows').value) || 3;
+    const c = parseInt(document.getElementById('cols').value) || 3;
+    createTable('matrix-a', r, c);
+    const inputs = document.getElementById('matrix-a').querySelectorAll('input');
+    const vals = [];
+    for (let i = 0; i < r; i++)
+      for (let j = 0; j < c; j++)
+        vals.push(i === j ? '1' : String(Math.floor(Math.random() * 7) - 3));
+    inputs.forEach((inp, idx) => { if (vals[idx]) inp.value = vals[idx]; });
+  });
+
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    document.querySelectorAll('#matrix-a input, #matrix-b input').forEach(inp => inp.value = '0');
     resultSection.style.display = 'none';
-  }
+  });
 
-  function clearMatrix() {
-    const inputs = matrixTable.querySelectorAll('input');
-    inputs.forEach(inp => inp.value = '0');
-    resultSection.style.display = 'none';
-  }
+  // Rows/cols change -> auto rebuild
+  ['rows', 'cols'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => {
+      const r = parseInt(document.getElementById('rows').value) || 3;
+      const c = parseInt(document.getElementById('cols').value) || 3;
+      createTable('matrix-a', r, c);
+    });
+  });
+  ['rows2', 'cols2'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => {
+      const r = parseInt(document.getElementById('rows2').value) || 3;
+      const c = parseInt(document.getElementById('cols2').value) || 3;
+      createTable('matrix-b', r, c);
+    });
+  });
 
-  function fillExample() {
-    // Example: matrix with parameter
-    const param = document.getElementById('param').value || 'a';
-    const examples = {
-      '3x4': [
-        ['1', '2', '-1', '3'],
-        ['2', '1', param, '1'],
-        ['-1', '1', '2', param]
-      ],
-      '2x3': [
-        ['1', param, '2'],
-        ['3', '1', '-1']
-      ]
-    };
+  // Calculate
+  document.getElementById('btn-calc').addEventListener('click', async () => {
+    const rows = parseInt(document.getElementById('rows').value) || 3;
+    const cols = parseInt(document.getElementById('cols').value) || 3;
+    const matrix = getMatrixValues('matrix-a', rows, cols);
 
-    const key = `${rows}x${cols}`;
-    let data = examples[key];
+    const body = { op: currentOp, rows, cols, matrix };
 
-    if (!data) {
-      // Generate a simple example
-      data = [];
-      for (let i = 0; i < rows; i++) {
-        const row = [];
-        for (let j = 0; j < cols; j++) {
-          if (i === j) row.push('1');
-          else if (j === cols - 1 && i === 1) row.push(param);
-          else row.push(String(Math.floor(Math.random() * 5) - 2));
-        }
-        data.push(row);
-      }
+    if (sectionB.style.display !== 'none') {
+      const rows2 = parseInt(document.getElementById('rows2').value) || rows;
+      const cols2 = parseInt(document.getElementById('cols2').value) || cols;
+      body.rows2 = rows2;
+      body.cols2 = cols2;
+      body.matrix2 = getMatrixValues('matrix-b', rows2, cols2);
     }
 
-    // Ensure matrix is created first
-    if (matrixSection.style.display === 'none') {
-      createMatrix();
+    if (sectionScalar.style.display !== 'none') {
+      body.scalar = document.getElementById('scalar-val').value.trim() || '1';
     }
 
-    const inputs = matrixTable.querySelectorAll('input');
-    let idx = 0;
-    for (let i = 0; i < rows; i++) {
-      for (let j = 0; j < cols; j++) {
-        if (data[i] && data[i][j] !== undefined) {
-          inputs[idx].value = data[i][j];
-        }
-        idx++;
-      }
-    }
-  }
-
-  async function doReduce() {
-    const inputs = matrixTable.querySelectorAll('input');
-    const matrix = [];
-    inputs.forEach(inp => matrix.push(inp.value.trim() || '0'));
-
-    // Disable button
-    btnReduce.disabled = true;
-    btnReduce.textContent = '计算中...';
+    const btn = document.getElementById('btn-calc');
+    btn.disabled = true;
+    btn.textContent = '计算中...';
 
     try {
-      const resp = await fetch('/api/reduce', {
+      const resp = await fetch('/api/calc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows, cols, matrix })
+        body: JSON.stringify(body)
       });
-
       const data = await resp.json();
 
       if (data.error) {
-        stepsContainer.innerHTML = `<div class="error">${data.error}</div>`;
-        resultSection.style.display = 'block';
-        return;
+        resultContent.innerHTML = `<div class="error">${data.error}</div>`;
+        resultTitle.textContent = '错误';
+      } else {
+        renderResult(data);
       }
-
-      renderSteps(data.steps);
       resultSection.style.display = 'block';
       resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) {
-      stepsContainer.innerHTML = `<div class="error">请求失败：${err.message}</div>`;
+      resultContent.innerHTML = `<div class="error">请求失败：${err.message}</div>`;
       resultSection.style.display = 'block';
     } finally {
-      btnReduce.disabled = false;
-      btnReduce.textContent = '开始化简';
+      btn.disabled = false;
+      btn.textContent = '计算';
     }
+  });
+
+  // Render
+  function fracStr(f) {
+    if (!f) return '0';
+    if (f.den === 1) return String(f.num);
+    return `${f.num}/${f.den}`;
   }
 
   function formatEntry(e) {
-    // Format an entry object for display
     if (!e) return '0';
-
-    const c = e.const;
-    const p = e.coeff;
-
-    const cZero = c.num === 0;
-    const pZero = p.num === 0;
-
-    if (cZero && pZero) return '0';
-
-    let parts = [];
-
-    // Constant part
-    if (!cZero) {
-      parts.push(fracStr(c));
-    }
-
-    // Param part
-    if (!pZero) {
-      let coeffStr = '';
-      if (p.num === 1 && p.den === 1) {
-        coeffStr = 'a';
-      } else if (p.num === -1 && p.den === 1) {
-        coeffStr = '-a';
-      } else if (p.den === 1) {
-        coeffStr = p.num + 'a';
-      } else {
-        coeffStr = `(${fracStr(p)})a`;
-      }
-
-      if (cZero) {
-        return coeffStr;
-      }
-
-      // Combine with sign
-      if (p.num > 0) {
-        return parts[0] + '+' + coeffStr;
-      } else {
-        return parts[0] + coeffStr; // already has minus
-      }
-    }
-
-    return parts[0];
+    const c = e.const || e.c || e;
+    const p = e.coeff || e.p || { num: 0, den: 1 };
+    if (c.num === 0 && p.num === 0) return '0';
+    if (p.num === 0) return fracStr(c);
+    let ps;
+    if (p.num === 1 && p.den === 1) ps = 'a';
+    else if (p.num === -1 && p.den === 1) ps = '-a';
+    else if (p.den === 1) ps = p.num + 'a';
+    else ps = `(${fracStr(p)})a`;
+    if (c.num === 0) return ps;
+    return p.num > 0 ? fracStr(c) + '+' + ps : fracStr(c) + ps;
   }
 
-  function fracStr(f) {
-    if (f.den === 1) return String(f.num);
-    return f.num + '/' + f.den;
-  }
-
-  function renderSteps(steps) {
-    stepsContainer.innerHTML = '';
-
-    steps.forEach((step, idx) => {
-      const div = document.createElement('div');
-      div.className = 'step' + (step.desc === '初始矩阵' ? ' initial' : '');
-
-      // Header
-      const header = document.createElement('div');
-      header.className = 'step-header';
-      header.innerHTML = `
-        <span class="step-num">${step.index}</span>
-        <span class="step-desc">${step.desc}</span>
-      `;
-      div.appendChild(header);
-
-      // Matrix
-      const matrixDiv = document.createElement('div');
-      matrixDiv.className = 'step-matrix';
-
-      const table = document.createElement('table');
-      step.matrix.forEach(row => {
-        const tr = document.createElement('tr');
-        row.forEach(cell => {
-          const td = document.createElement('td');
-          const text = formatEntry(cell);
-          td.textContent = text;
-
-          if (text === '0') td.classList.add('zero');
-          if (text.includes('a')) td.classList.add('has-param');
-          if (text === '1' || text === '-1') td.classList.add('is-one');
-
-          tr.appendChild(td);
-        });
-        table.appendChild(tr);
+  function renderMatrix(m) {
+    if (!m || !m.length) return '';
+    let html = '<table>';
+    m.forEach(row => {
+      html += '<tr>';
+      row.forEach(cell => {
+        const text = formatEntry(cell);
+        let cls = '';
+        if (text === '0') cls = 'zero';
+        if (text === '1' || text === '-1') cls = 'is-one';
+        html += `<td class="${cls}">${text}</td>`;
       });
-
-      matrixDiv.appendChild(table);
-      div.appendChild(matrixDiv);
-      stepsContainer.appendChild(div);
+      html += '</tr>';
     });
+    html += '</table>';
+    return html;
   }
 
-  // Auto-create matrix on load
-  createMatrix();
+  function renderResult(data) {
+    const op = OPS[currentCat].find(o => o.id === currentOp);
+    resultTitle.textContent = op ? op.name : '结果';
+
+    let html = '';
+
+    // Steps
+    if (data.steps && data.steps.length) {
+      data.steps.forEach(step => {
+        html += `<div class="step">
+          <div class="step-header">
+            <span class="step-num">${step.index}</span>
+            <span class="step-desc">${step.desc}</span>
+          </div>
+          <div class="step-matrix">${renderMatrix(step.matrix)}</div>
+        </div>`;
+      });
+    }
+
+    // Final result box
+    if (data.result !== null && data.result !== undefined) {
+      if (typeof data.result === 'object' && data.result.num !== undefined) {
+        // Scalar result (det, trace, rank)
+        html += `<div class="result-box">
+          <div class="label">最终结果</div>
+          <div class="value">${fracStr(data.result)}</div>
+        </div>`;
+      } else if (Array.isArray(data.result)) {
+        // Matrix result
+        html += `<div class="result-box">
+          <div class="label">最终结果</div>
+          <div class="step-matrix">${renderMatrix(data.result)}</div>
+        </div>`;
+      }
+    }
+
+    resultContent.innerHTML = html;
+  }
+
+  // Init
+  createTable('matrix-a', 3, 3);
+  createTable('matrix-b', 3, 3);
+  renderOps();
+  updateVisibility();
 });
