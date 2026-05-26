@@ -76,10 +76,17 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateVisibility() {
     const allOps = Object.values(OPS).flat();
     const op = allOps.find(o => o.id === currentOp);
-    sectionA.style.display = op?.isAI ? 'none' : 'block';
+    const isAI = op?.isAI;
+    sectionA.style.display = isAI ? 'none' : 'block';
     sectionB.style.display = op?.needB ? 'block' : 'none';
     sectionScalar.style.display = op?.needScalar ? 'block' : 'none';
-    sectionAI.style.display = op?.isAI ? 'block' : 'none';
+    sectionAI.style.display = isAI ? 'block' : 'none';
+    // 切换按钮文字
+    const btnCalc = document.getElementById('btn-calc');
+    btnCalc.textContent = isAI ? '开始解题' : '计算';
+    // 显示/隐藏符号面板按钮
+    document.getElementById('btn-symbols').style.display = isAI ? 'inline-block' : 'none';
+    if (!isAI) document.getElementById('symbol-panel').style.display = 'none';
   }
 
   function createTable(id, rows, cols) {
@@ -127,6 +134,27 @@ document.addEventListener('DOMContentLoaded', () => {
     resultSection.style.display = 'none';
   });
 
+  // Symbol panel toggle
+  document.getElementById('btn-symbols').addEventListener('click', () => {
+    const panel = document.getElementById('symbol-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  });
+
+  // Insert symbol into textarea
+  document.querySelectorAll('.sym-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const textarea = document.getElementById('ai-input');
+      const sym = btn.dataset.sym;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const text = textarea.value;
+      textarea.value = text.substring(0, start) + sym + text.substring(end);
+      textarea.focus();
+      const newPos = start + sym.length;
+      textarea.setSelectionRange(newPos, newPos);
+    });
+  });
+
   ['rows', 'cols'].forEach(id => {
     document.getElementById(id).addEventListener('change', () => {
       createTable('matrix-a', parseInt(document.getElementById('rows').value) || 3, parseInt(document.getElementById('cols').value) || 3);
@@ -164,17 +192,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const btn = document.getElementById('btn-calc');
-    btn.disabled = true; btn.textContent = '计算中...';
+    const progress = document.getElementById('progress');
+    btn.disabled = true; btn.textContent = isAI ? '解题中...' : '计算中...';
+    if (isAI) {
+      progress.style.display = 'flex';
+      progress.querySelector('.progress-text').textContent = 'AI 正在思考...';
+    }
 
     try {
       const resp = await fetch('/api/calc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await resp.json();
+      if (isAI) progress.querySelector('.progress-text').textContent = '正在渲染结果...';
       if (data.error) { resultContent.innerHTML = `<div class="error">${data.error}</div>`; resultTitle.textContent = '错误'; }
       else { renderResult(data); }
       resultSection.style.display = 'block';
       resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) { resultContent.innerHTML = `<div class="error">请求失败：${err.message}</div>`; resultSection.style.display = 'block'; }
-    finally { btn.disabled = false; btn.textContent = '计算'; }
+    finally { btn.disabled = false; btn.textContent = isAI ? '开始解题' : '计算'; progress.style.display = 'none'; }
   });
 
   // Render

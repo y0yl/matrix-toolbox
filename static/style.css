@@ -67,6 +67,16 @@ header h1{font-size:26px;font-weight:700;color:#1a1a2e}
 
 .ai-textarea{width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;outline:none;line-height:1.6}
 .ai-textarea:focus{border-color:#4a6cf7;box-shadow:0 0 0 2px rgba(74,108,247,.08)}
+.symbol-panel{margin-top:10px;padding:12px;background:#fafbfc;border:1px solid #eee;border-radius:8px}
+.symbol-group{margin-bottom:8px;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.symbol-label{font-size:12px;color:#888;min-width:60px}
+.sym-btn{padding:4px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:13px;cursor:pointer;transition:all .15s;font-family:"SF Mono",monospace}
+.sym-btn:hover{border-color:#4a6cf7;background:#f0f3ff}
+.sym-btn:active{transform:scale(.96)}
+.progress-bar{display:flex;align-items:center;gap:10px;justify-content:center;padding:14px;background:#fff;border-radius:10px;border:1px solid #e0e7ff;margin-bottom:16px}
+.progress-dot{width:8px;height:8px;border-radius:50%;background:#4a6cf7;animation:pulse 1.2s ease-in-out infinite}
+.progress-text{font-size:13px;color:#4a6cf7;font-weight:500}
+@keyframes pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
 .error{color:#ef4444;background:#fef2f2;border:1px solid #fecaca;padding:12px;border-radius:8px;text-align:center;font-size:13px}
 .ai-box{background:#f0f7ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px 18px;margin-top:4px}
 .ai-heading{font-size:15px;font-weight:600;color:#1e40af;margin:10px 0 6px}
