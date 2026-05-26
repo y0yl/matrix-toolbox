@@ -10,51 +10,40 @@
 <div class="container">
   <header>
     <h1>矩阵工具箱</h1>
-    <p class="subtitle">矩阵运算 · 行列式 · 逐步化简</p>
+    <p class="subtitle">矩阵运算 · 行列式 · 特征值 · 证明 · AI解题</p>
   </header>
 
-  <!-- Operation selector -->
   <section class="op-section">
     <div class="op-tabs">
       <button class="op-tab active" data-cat="basic">基本运算</button>
       <button class="op-tab" data-cat="transform">变换化简</button>
       <button class="op-tab" data-cat="property">性质求解</button>
       <button class="op-tab" data-cat="proof">性质证明</button>
+      <button class="op-tab" data-cat="ai">AI解题</button>
     </div>
     <div class="op-grid" id="op-grid"></div>
   </section>
 
-  <!-- Matrix A input -->
   <section class="input-section" id="section-a">
     <h3>矩阵 A</h3>
     <div class="size-row">
-      <label>行</label>
-      <input type="number" id="rows" min="1" max="10" value="3">
-      <label>列</label>
-      <input type="number" id="cols" min="1" max="10" value="3">
+      <label>行</label><input type="number" id="rows" min="1" max="10" value="3">
+      <label>列</label><input type="number" id="cols" min="1" max="10" value="3">
       <button id="btn-create" class="btn btn-primary">生成</button>
       <button id="btn-example" class="btn btn-secondary">示例</button>
     </div>
-    <div class="matrix-input-wrap">
-      <table id="matrix-a"></table>
-    </div>
+    <div class="matrix-input-wrap"><table id="matrix-a"></table></div>
   </section>
 
-  <!-- Matrix B input (for binary ops) -->
   <section class="input-section" id="section-b" style="display:none">
     <h3>矩阵 B</h3>
     <div class="size-row">
-      <label>行</label>
-      <input type="number" id="rows2" min="1" max="10" value="3">
-      <label>列</label>
-      <input type="number" id="cols2" min="1" max="10" value="3">
+      <label>行</label><input type="number" id="rows2" min="1" max="10" value="3">
+      <label>列</label><input type="number" id="cols2" min="1" max="10" value="3">
     </div>
-    <div class="matrix-input-wrap">
-      <table id="matrix-b"></table>
-    </div>
+    <div class="matrix-input-wrap"><table id="matrix-b"></table></div>
   </section>
 
-  <!-- Scalar input -->
   <section class="input-section" id="section-scalar" style="display:none">
     <h3>标量 k</h3>
     <div class="size-row">
@@ -63,19 +52,21 @@
     </div>
   </section>
 
-  <!-- Action -->
+  <section class="input-section" id="section-ai" style="display:none">
+    <h3>输入线性代数问题</h3>
+    <textarea id="ai-input" class="ai-textarea" placeholder="例：求矩阵 [1,2;3,4] 的特征值和特征向量&#10;例：证明 n 阶单位阵的行列式等于1&#10;例：解线性方程组 x + 2y = 3, 2x + 5y = 7" rows="4"></textarea>
+  </section>
+
   <div class="action-row">
     <button id="btn-calc" class="btn btn-accent">计算</button>
     <button id="btn-clear" class="btn btn-secondary">清空</button>
   </div>
 
-  <!-- Result -->
   <section class="result-section" id="result-section" style="display:none">
     <h2 id="result-title">结果</h2>
     <div id="result-content"></div>
   </section>
 </div>
-
 <script src="/static/script.js"></script>
 </body>
 </html>
