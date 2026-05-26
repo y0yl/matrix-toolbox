@@ -19,6 +19,20 @@ document.addEventListener('DOMContentLoaded', () => {
       { id: 'trace', name: '迹', icon: 'Σ', needSquare: true },
       { id: 'cofactor', name: '余子式', icon: '🧮', needSquare: true },
       { id: 'adjugate', name: '伴随矩阵', icon: '📋', needSquare: true },
+    ],
+    proof: [
+      { id: 'transpose-mul', name: '(AB)ᵀ=BᵀAᵀ', icon: '↕️', proof: true, needB: true },
+      { id: 'transpose-add', name: '(A+B)ᵀ=Aᵀ+Bᵀ', icon: '➕', proof: true, needB: true },
+      { id: 'transpose-transpose', name: '(Aᵀ)ᵀ=A', icon: '🔄', proof: true },
+      { id: 'inverse-mul', name: 'A·A⁻¹=I', icon: '✖️', proof: true, needSquare: true },
+      { id: 'inverse-mul-reverse', name: '(AB)⁻¹=B⁻¹A⁻¹', icon: '🔀', proof: true, needB: true, needSquare: true },
+      { id: 'det-mul', name: 'det(AB)=detA·detB', icon: '📏', proof: true, needB: true, needSquare: true },
+      { id: 'det-transpose', name: 'det(Aᵀ)=detA', icon: '↕️', proof: true, needSquare: true },
+      { id: 'det-scalar', name: 'det(kA)=kⁿdetA', icon: '🔢', proof: true, needSquare: true, needScalar: true },
+      { id: 'trace-mul', name: 'tr(AB)=tr(BA)', icon: 'Σ', proof: true, needB: true },
+      { id: 'trace-add', name: 'tr(A+B)=trA+trB', icon: 'Σ', proof: true, needB: true, needSquare: true },
+      { id: 'adjugate-mul', name: 'A·adj(A)=detA·I', icon: '📋', proof: true, needSquare: true },
+      { id: 'det-trace-2x2', name: '2×2特征多项式', icon: '📐', proof: true, needSquare: true },
     ]
   };
 
@@ -143,7 +157,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const cols = parseInt(document.getElementById('cols').value) || 3;
     const matrix = getMatrixValues('matrix-a', rows, cols);
 
-    const body = { op: currentOp, rows, cols, matrix };
+    // Check if current op is a proof
+    const allOps = Object.values(OPS).flat();
+    const currentOpDef = allOps.find(o => o.id === currentOp);
+    const isProof = currentOpDef && currentOpDef.proof;
+
+    const body = isProof
+      ? { op: 'proof', proofId: currentOp, rows, cols, matrix }
+      : { op: currentOp, rows, cols, matrix };
 
     if (sectionB.style.display !== 'none') {
       const rows2 = parseInt(document.getElementById('rows2').value) || rows;
@@ -245,16 +266,23 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
+    // Proof conclusion
+    if (data.conclusion) {
+      const color = data.proved ? '#059669' : '#ef4444';
+      html += `<div class="result-box" style="border-color:${data.proved ? '#bbf7d0' : '#fecaca'};background:${data.proved ? '#f0fdf4' : '#fef2f2'}">
+        <div class="label" style="color:${color}">${data.proofName || '证明结论'}</div>
+        <div class="value" style="color:${color};font-size:18px">${data.conclusion}</div>
+      </div>`;
+    }
+
     // Final result box
-    if (data.result !== null && data.result !== undefined) {
+    if (data.result !== null && data.result !== undefined && !data.conclusion) {
       if (typeof data.result === 'object' && data.result.num !== undefined) {
-        // Scalar result (det, trace, rank)
         html += `<div class="result-box">
           <div class="label">最终结果</div>
           <div class="value">${fracStr(data.result)}</div>
         </div>`;
       } else if (Array.isArray(data.result)) {
-        // Matrix result
         html += `<div class="result-box">
           <div class="label">最终结果</div>
           <div class="step-matrix">${renderMatrix(data.result)}</div>

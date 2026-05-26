@@ -424,7 +424,223 @@ function matCofactor(m) {
   return { result: cofactors, steps };
 }
 
-// ============== Handler ==============
+// ============== Proofs ===============
+function matEquals(a, b) {
+  if (a.length !== b.length || a[0].length !== b[0].length) return false;
+  for (let i = 0; i < a.length; i++)
+    for (let j = 0; j < a[0].length; j++)
+      if (!a[i][j].equals(b[i][j])) return false;
+  return true;
+}
+
+function identity(n) {
+  const m = createMatrix(n, n);
+  for (let i = 0; i < n; i++) m[i][i] = F1();
+  return m;
+}
+
+function isIdentity(m) {
+  return matEquals(m, identity(m.length));
+}
+
+const PROOFS = {
+  'transpose-mul': {
+    name: '(AB)ᵀ = BᵀAᵀ',
+    needB: true,
+    prove(a, b) {
+      const steps = [];
+      const ab = matMul(a, b);
+      steps.push({ index: 1, desc: '计算 AB', matrix: matToJSON(ab) });
+      const lhs = matTranspose(ab);
+      steps.push({ index: 2, desc: '左边 = (AB)ᵀ', matrix: matToJSON(lhs) });
+      const at = matTranspose(a), bt = matTranspose(b);
+      steps.push({ index: 3, desc: '计算 Bᵀ 和 Aᵀ', matrix: matToJSON(bt) });
+      const rhs = matMul(bt, at);
+      steps.push({ index: 4, desc: '右边 = BᵀAᵀ', matrix: matToJSON(rhs) });
+      const eq = matEquals(lhs, rhs);
+      return { steps, conclusion: eq ? '✓ (AB)ᵀ = BᵀAᵀ 成立' : '✗ 不相等', proved: eq };
+    }
+  },
+  'transpose-add': {
+    name: '(A+B)ᵀ = Aᵀ + Bᵀ',
+    needB: true,
+    prove(a, b) {
+      const steps = [];
+      const lhs = matTranspose(matAdd(a, b));
+      steps.push({ index: 1, desc: '左边 = (A+B)ᵀ', matrix: matToJSON(lhs) });
+      const rhs = matAdd(matTranspose(a), matTranspose(b));
+      steps.push({ index: 2, desc: '右边 = Aᵀ + Bᵀ', matrix: matToJSON(rhs) });
+      const eq = matEquals(lhs, rhs);
+      return { steps, conclusion: eq ? '✓ (A+B)ᵀ = Aᵀ + Bᵀ 成立' : '✗ 不相等', proved: eq };
+    }
+  },
+  'transpose-transpose': {
+    name: '(Aᵀ)ᵀ = A',
+    needB: false,
+    prove(a) {
+      const steps = [];
+      const at = matTranspose(a);
+      steps.push({ index: 1, desc: '计算 Aᵀ', matrix: matToJSON(at) });
+      const lhs = matTranspose(at);
+      steps.push({ index: 2, desc: '计算 (Aᵀ)ᵀ', matrix: matToJSON(lhs) });
+      const eq = matEquals(lhs, a);
+      return { steps, conclusion: eq ? '✓ (Aᵀ)ᵀ = A 成立' : '✗ 不相等', proved: eq };
+    }
+  },
+  'inverse-mul': {
+    name: 'A·A⁻¹ = I',
+    needB: false,
+    needSquare: true,
+    prove(a) {
+      const steps = [];
+      const inv = matInverse(a);
+      if (inv.error) return { steps: inv.steps, conclusion: '✗ 矩阵不可逆', proved: false };
+      steps.push(...inv.steps);
+      const lhs = matMul(a, inv.result);
+      steps.push({ index: steps.length + 1, desc: '计算 A·A⁻¹', matrix: matToJSON(lhs) });
+      const eq = isIdentity(lhs);
+      return { steps, conclusion: eq ? '✓ A·A⁻¹ = I 成立' : '✗ 不等于单位阵', proved: eq };
+    }
+  },
+  'inverse-mul-reverse': {
+    name: '(AB)⁻¹ = B⁻¹A⁻¹',
+    needB: true,
+    needSquare: true,
+    prove(a, b) {
+      const steps = [];
+      const ab = matMul(a, b);
+      steps.push({ index: 1, desc: '计算 AB', matrix: matToJSON(ab) });
+      const invAB = matInverse(ab);
+      if (invAB.error) return { steps, conclusion: '✗ AB不可逆', proved: false };
+      steps.push({ index: 2, desc: '左边 = (AB)⁻¹', matrix: matToJSON(invAB.result) });
+      const invA = matInverse(a), invB = matInverse(b);
+      if (invA.error || invB.error) return { steps, conclusion: '✗ A或B不可逆', proved: false };
+      const rhs = matMul(invB.result, invA.result);
+      steps.push({ index: 3, desc: '右边 = B⁻¹A⁻¹', matrix: matToJSON(rhs) });
+      const eq = matEquals(invAB.result, rhs);
+      return { steps, conclusion: eq ? '✓ (AB)⁻¹ = B⁻¹A⁻¹ 成立' : '✗ 不相等', proved: eq };
+    }
+  },
+  'det-mul': {
+    name: 'det(AB) = det(A)·det(B)',
+    needB: true,
+    needSquare: true,
+    prove(a, b) {
+      const steps = [];
+      const ab = matMul(a, b);
+      steps.push({ index: 1, desc: '计算 AB', matrix: matToJSON(ab) });
+      const detAB = matDet(ab);
+      steps.push(...detAB.steps);
+      steps.push({ index: steps.length + 1, desc: `det(AB) = ${fracStr(detAB.result)}`, matrix: matToJSON(ab) });
+      const detA = matDet(a), detB = matDet(b);
+      const rhs = detA.result.mul(detB.result);
+      steps.push({ index: steps.length + 1, desc: `det(A)·det(B) = ${fracStr(detA.result)} × ${fracStr(detB.result)} = ${fracStr(rhs)}`, matrix: matToJSON(a) });
+      const eq = detAB.result.equals(rhs);
+      return { steps, conclusion: eq ? '✓ det(AB) = det(A)·det(B) 成立' : '✗ 不相等', proved: eq };
+    }
+  },
+  'det-transpose': {
+    name: 'det(Aᵀ) = det(A)',
+    needB: false,
+    needSquare: true,
+    prove(a) {
+      const steps = [];
+      const detA = matDet(a);
+      steps.push(...detA.steps);
+      steps.push({ index: steps.length + 1, desc: `det(A) = ${fracStr(detA.result)}`, matrix: matToJSON(a) });
+      const at = matTranspose(a);
+      const detAT = matDet(at);
+      steps.push({ index: steps.length + 1, desc: `det(Aᵀ) = ${fracStr(detAT.result)}`, matrix: matToJSON(at) });
+      const eq = detA.result.equals(detAT.result);
+      return { steps, conclusion: eq ? '✓ det(Aᵀ) = det(A) 成立' : '✗ 不相等', proved: eq };
+    }
+  },
+  'det-scalar': {
+    name: 'det(kA) = kⁿ·det(A)',
+    needB: false,
+    needSquare: true,
+    needScalar: true,
+    prove(a, b, k) {
+      const steps = [];
+      const n = a.length;
+      const detA = matDet(a);
+      steps.push(...detA.steps);
+      steps.push({ index: steps.length + 1, desc: `det(A) = ${fracStr(detA.result)}`, matrix: matToJSON(a) });
+      const kA = matScale(a, k);
+      const detkA = matDet(kA);
+      steps.push(...detkA.steps);
+      steps.push({ index: steps.length + 1, desc: `det(kA) = ${fracStr(detkA.result)}`, matrix: matToJSON(kA) });
+      const kn = Math.pow(k.toNumber(), n);
+      const rhs = detA.result.mul(new Fraction(kn));
+      steps.push({ index: steps.length + 1, desc: `kⁿ·det(A) = ${fracStr(k)}^${n} × ${fracStr(detA.result)} = ${fracStr(rhs)}`, matrix: matToJSON(a) });
+      const eq = detkA.result.equals(rhs);
+      return { steps, conclusion: eq ? '✓ det(kA) = kⁿ·det(A) 成立' : '✗ 不相等', proved: eq };
+    }
+  },
+  'trace-mul': {
+    name: 'tr(AB) = tr(BA)',
+    needB: true,
+    prove(a, b) {
+      const steps = [];
+      const ab = matMul(a, b), ba = matMul(b, a);
+      steps.push({ index: 1, desc: '计算 AB', matrix: matToJSON(ab) });
+      steps.push({ index: 2, desc: '计算 BA', matrix: matToJSON(ba) });
+      const trAB = matTrace(ab), trBA = matTrace(ba);
+      steps.push({ index: 3, desc: `tr(AB) = ${fracStr(trAB)}，tr(BA) = ${fracStr(trBA)}`, matrix: matToJSON(ab) });
+      const eq = trAB.equals(trBA);
+      return { steps, conclusion: eq ? '✓ tr(AB) = tr(BA) 成立' : '✗ 不相等', proved: eq };
+    }
+  },
+  'trace-add': {
+    name: 'tr(A+B) = tr(A) + tr(B)',
+    needB: true,
+    needSquare: true,
+    prove(a, b) {
+      const steps = [];
+      const trA = matTrace(a), trB = matTrace(b);
+      const trAB = matTrace(matAdd(a, b));
+      const rhs = trA.add(trB);
+      steps.push({ index: 1, desc: `tr(A) = ${fracStr(trA)}，tr(B) = ${fracStr(trB)}`, matrix: matToJSON(a) });
+      steps.push({ index: 2, desc: `tr(A+B) = ${fracStr(trAB)}，tr(A)+tr(B) = ${fracStr(rhs)}`, matrix: matToJSON(matAdd(a, b)) });
+      const eq = trAB.equals(rhs);
+      return { steps, conclusion: eq ? '✓ tr(A+B) = tr(A)+tr(B) 成立' : '✗ 不相等', proved: eq };
+    }
+  },
+  'adjugate-mul': {
+    name: 'A·adj(A) = det(A)·I',
+    needB: false,
+    needSquare: true,
+    prove(a) {
+      const steps = [];
+      const adj = matAdjugate(a);
+      if (adj.error) return { steps, conclusion: '✗ ' + adj.error, proved: false };
+      steps.push(...adj.steps);
+      const lhs = matMul(a, adj.result);
+      steps.push({ index: steps.length + 1, desc: '计算 A·adj(A)', matrix: matToJSON(lhs) });
+      const detA = matDet(a);
+      const rhs = matScale(identity(a.length), detA.result);
+      steps.push({ index: steps.length + 1, desc: `det(A)·I = ${fracStr(detA.result)}·I`, matrix: matToJSON(rhs) });
+      const eq = matEquals(lhs, rhs);
+      return { steps, conclusion: eq ? '✓ A·adj(A) = det(A)·I 成立' : '✗ 不相等', proved: eq };
+    }
+  },
+  'det-trace-2x2': {
+    name: '2×2特征多项式',
+    needB: false,
+    needSquare: true,
+    prove(a) {
+      if (a.length !== 2) return { steps: [], conclusion: '✗ 仅支持2×2矩阵', proved: false };
+      const steps = [];
+      const detA = matDet(a);
+      const trA = matTrace(a);
+      steps.push({ index: 1, desc: `det(A) = ${fracStr(detA.result)}`, matrix: matToJSON(a) });
+      steps.push({ index: 2, desc: `tr(A) = ${fracStr(trA)}`, matrix: matToJSON(a) });
+      steps.push({ index: 3, desc: `特征多项式: λ² - (${fracStr(trA)})λ + (${fracStr(detA.result)}) = 0`, matrix: matToJSON(a) });
+      return { steps, conclusion: `λ² - ${fracStr(trA)}λ + ${fracStr(detA.result)} = 0`, proved: true };
+    }
+  }
+};
+
 function parseMatrix(matrix, rows, cols) {
   const data = [];
   let idx = 0;
@@ -519,6 +735,15 @@ function handleAPI(req, res) {
         case 'cofactor': {
           const r = matCofactor(m);
           response = { steps: r.steps, result: r.result ? matToJSON(r.result) : null, error: r.error };
+          break;
+        }
+        case 'proof': {
+          const { proofId } = input;
+          const proof = PROOFS[proofId];
+          if (!proof) { response = { error: '未知证明题' }; break; }
+          const k = scalar ? parseNum(scalar) : F1();
+          const r = proof.prove(m, m2, k);
+          response = { steps: r.steps, conclusion: r.conclusion, proved: r.proved, proofName: proof.name };
           break;
         }
         default:
