@@ -60,47 +60,39 @@
     <textarea id="ai-input" class="ai-textarea" placeholder="例：求矩阵 [1,2;3,4] 的特征值和特征向量&#10;例：证明 n 阶单位阵的行列式等于1&#10;例：解线性方程组 x + 2y = 3, 2x + 5y = 7" rows="4"></textarea>
     <div class="symbol-panel" id="symbol-panel" style="display:none">
       <div class="symbol-group">
-        <span class="symbol-label">矩阵</span>
-        <button class="sym-btn" data-sym="\\begin{bmatrix}  &  \\\\  &  \\end{bmatrix}">矩阵 []</button>
-        <button class="sym-btn" data-sym="\\begin{pmatrix}  &  \\\\  &  \\end{pmatrix}">矩阵 ()</button>
-        <button class="sym-btn" data-sym="\\begin{vmatrix}  &  \\\\  &  \\end{vmatrix}">行列式</button>
+        <span class="symbol-label">矩阵格式</span>
+        <button class="sym-btn" data-sym="[1, 2; 3, 4]">矩阵 [a, b; c, d]</button>
+        <button class="sym-btn" data-sym="(1, 2; 3, 4)">矩阵 (a, b; c, d)</button>
+        <button class="sym-btn" data-sym="| 1, 2; 3, 4 |">行列式 |a,b;c,d|</button>
       </div>
       <div class="symbol-group">
-        <span class="symbol-label">运算</span>
-        <button class="sym-btn" data-sym="\\det(A)">det</button>
-        <button class="sym-btn" data-sym="\\text{tr}(A)">tr</button>
-        <button class="sym-btn" data-sym="A^{-1}">A⁻¹</button>
-        <button class="sym-btn" data-sym="A^{T}">Aᵀ</button>
-        <button class="sym-btn" data-sym="A^{*}">A*</button>
+        <span class="symbol-label">运算符号</span>
+        <button class="sym-btn" data-sym="det(A)">det(A)</button>
+        <button class="sym-btn" data-sym="tr(A)">tr(A)</button>
+        <button class="sym-btn" data-sym="A^(-1)">A⁻¹</button>
+        <button class="sym-btn" data-sym="A^T">Aᵀ</button>
+        <button class="sym-btn" data-sym="A*">伴随 A*</button>
       </div>
       <div class="symbol-group">
         <span class="symbol-label">希腊字母</span>
-        <button class="sym-btn" data-sym="\\lambda">λ</button>
-        <button class="sym-btn" data-sym="\\alpha">α</button>
-        <button class="sym-btn" data-sym="\\beta">β</button>
-        <button class="sym-btn" data-sym="\\mu">μ</button>
-        <button class="sym-btn" data-sym="\\sigma">σ</button>
+        <button class="sym-btn" data-sym="λ">λ</button>
+        <button class="sym-btn" data-sym="α">α</button>
+        <button class="sym-btn" data-sym="β">β</button>
+        <button class="sym-btn" data-sym="μ">μ</button>
+        <button class="sym-btn" data-sym="σ">σ</button>
+        <button class="sym-btn" data-sym="Δ">Δ</button>
       </div>
       <div class="symbol-group">
-        <span class="symbol-label">数学符号</span>
-        <button class="sym-btn" data-sym="\\frac{ }{ }">分数</button>
-        <button class="sym-btn" data-sym="\\sqrt{ }">根号</button>
-        <button class="sym-btn" data-sym="\\sum_{i=1}^{n}">求和</button>
-        <button class="sym-btn" data-sym="\\prod_{i=1}^{n}">求积</button>
-        <button class="sym-btn" data-sym="\\infty">∞</button>
-        <button class="sym-btn" data-sym="\\in">∈</button>
-        <button class="sym-btn" data-sym="\\forall">∀</button>
-        <button class="sym-btn" data-sym="\\exists">∃</button>
-      </div>
-      <div class="symbol-group">
-        <span class="symbol-label">向量空间</span>
-        <button class="sym-btn" data-sym="\\text{rank}(A)">rank</button>
-        <button class="sym-btn" data-sym="\\text{ker}(A)">ker</button>
-        <button class="sym-btn" data-sym="\\text{im}(A)">im</button>
-        <button class="sym-btn" data-sym="\\text{null}(A)">null</button>
-        <button class="sym-btn" data-sym="\\dim(V)">dim</button>
-        <button class="sym-btn" data-sym="\\langle u, v \">⟨u,v⟩</button>
-        <button class="sym-btn" data-sym="\\| v \\|">‖v‖</button>
+        <span class="symbol-label">常用表达</span>
+        <button class="sym-btn" data-sym="rank(A)">rank(A)</button>
+        <button class="sym-btn" data-sym="ker(A)">ker(A)</button>
+        <button class="sym-btn" data-sym="dim(V)">dim(V)</button>
+        <button class="sym-btn" data-sym="x₁, x₂, ..., xₙ">x₁...xₙ</button>
+        <button class="sym-btn" data-sym="∑ᵢ₌₁ⁿ">求和</button>
+        <button class="sym-btn" data-sym="∞">∞</button>
+        <button class="sym-btn" data-sym="∀">∀</button>
+        <button class="sym-btn" data-sym="∃">∃</button>
+        <button class="sym-btn" data-sym="∈">∈</button>
       </div>
     </div>
   </section>
