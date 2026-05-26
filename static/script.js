@@ -61,6 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderOps() {
     const ops = OPS[currentCat];
     opGrid.innerHTML = '';
+    // 切换分类时默认选中第一个
+    if (!ops.find(o => o.id === currentOp)) currentOp = ops[0]?.id;
     ops.forEach(op => {
       const btn = document.createElement('button');
       btn.className = 'op-btn' + (op.id === currentOp ? ' selected' : '');
@@ -68,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.addEventListener('click', () => { currentOp = op.id; document.querySelectorAll('.op-btn').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); updateVisibility(); });
       opGrid.appendChild(btn);
     });
+    updateVisibility();
   }
 
   function updateVisibility() {
@@ -208,14 +211,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // AI answer
     if (data.isLinearAlgebra === false && data.conclusion) {
       html += `<div class="error">${data.conclusion}</div>`;
-    } else if (data.steps?.length) {
-      data.steps.forEach(step => {
-        if (step.matrix) {
-          html += `<div class="step"><div class="step-header"><span class="step-num">${step.index}</span><span class="step-desc">${step.desc}</span></div><div class="step-matrix">${renderMatrix(step.matrix)}</div></div>`;
+    } else if (data.steps?.length && data.steps[0]?.desc && !data.steps[0]?.matrix) {
+      // AI answer - parse numbered steps
+      const text = data.steps[0].desc;
+      html += `<div class="ai-box">`;
+      text.split('\n').forEach(line => {
+        line = line.trim();
+        if (!line) return;
+        // Match numbered steps like "1. xxx" or "步骤1: xxx"
+        const m = line.match(/^(\d+)[\.、\)）]\s*(.*)/);
+        if (m) {
+          html += `<div class="ai-step"><span class="ai-step-num">${m[1]}</span><span class="ai-step-text">${m[2]}</span></div>`;
+        } else if (line.startsWith('**') || line.startsWith('##')) {
+          html += `<div class="ai-heading">${line.replace(/^[*#]+|[*#]+$/g, '')}</div>`;
         } else {
-          html += `<div class="ai-answer">${step.desc}</div>`;
+          html += `<div class="ai-line">${line}</div>`;
         }
       });
+      html += '</div>';
     }
 
     // Proof conclusion

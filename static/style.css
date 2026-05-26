@@ -68,7 +68,12 @@ header h1{font-size:26px;font-weight:700;color:#1a1a2e}
 .ai-textarea{width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;outline:none;line-height:1.6}
 .ai-textarea:focus{border-color:#4a6cf7;box-shadow:0 0 0 2px rgba(74,108,247,.08)}
 .error{color:#ef4444;background:#fef2f2;border:1px solid #fecaca;padding:12px;border-radius:8px;text-align:center;font-size:13px}
-.ai-answer{background:#f0f7ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;font-size:14px;line-height:1.8;white-space:pre-wrap;color:#1e40af}
+.ai-box{background:#f0f7ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px 18px;margin-top:4px}
+.ai-heading{font-size:15px;font-weight:600;color:#1e40af;margin:10px 0 6px}
+.ai-step{display:flex;align-items:flex-start;gap:10px;margin:8px 0;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #e0edff}
+.ai-step-num{background:#4a6cf7;color:#fff;font-size:12px;font-weight:600;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ai-step-text{font-size:14px;color:#333;line-height:1.6}
+.ai-line{font-size:14px;color:#444;line-height:1.7;margin:4px 0;padding-left:4px}
 
 /* Responsive */
 @media(max-width:600px){
