@@ -212,20 +212,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (data.isLinearAlgebra === false && data.conclusion) {
       html += `<div class="error">${data.conclusion}</div>`;
     } else if (data.steps?.length && data.steps[0]?.desc && !data.steps[0]?.matrix) {
-      // AI answer - parse numbered steps
+      // AI answer - parse numbered steps and render LaTeX
       const text = data.steps[0].desc;
-      html += `<div class="ai-box">`;
+      html += `<div class="ai-box" id="ai-result">`;
       text.split('\n').forEach(line => {
         line = line.trim();
         if (!line) return;
-        // Match numbered steps like "1. xxx" or "步骤1: xxx"
         const m = line.match(/^(\d+)[\.、\)）]\s*(.*)/);
         if (m) {
-          html += `<div class="ai-step"><span class="ai-step-num">${m[1]}</span><span class="ai-step-text">${m[2]}</span></div>`;
+          html += `<div class="ai-step"><span class="ai-step-num">${m[1]}</span><span class="ai-step-text">${escapeHtml(m[2])}</span></div>`;
         } else if (line.startsWith('**') || line.startsWith('##')) {
-          html += `<div class="ai-heading">${line.replace(/^[*#]+|[*#]+$/g, '')}</div>`;
+          html += `<div class="ai-heading">${escapeHtml(line.replace(/^[*#]+|[*#]+$/g, ''))}</div>`;
         } else {
-          html += `<div class="ai-line">${line}</div>`;
+          html += `<div class="ai-line">${escapeHtml(line)}</div>`;
         }
       });
       html += '</div>';
@@ -258,6 +257,24 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     resultContent.innerHTML = html;
+
+    // Render LaTeX with KaTeX
+    if (typeof renderMathInElement === 'function') {
+      renderMathInElement(resultContent, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+          { left: '\\(', right: '\\)', display: false },
+          { left: '\\[', right: '\\]', display: true }
+        ],
+        throwOnError: false
+      });
+    }
+  }
+
+  function escapeHtml(s) {
+    // Don't escape $ signs for LaTeX
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   // Init
