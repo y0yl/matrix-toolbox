@@ -567,4 +567,4 @@ const server = http.createServer((req, res) => {
 });
 
 const PORT = 6130;
-server.listen(PORT, '0.0.0.0', () => console.log(`Server on :${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`Matrix Toolbox running on :${PORT}`));
