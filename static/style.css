@@ -77,6 +77,20 @@ header h1{font-size:26px;font-weight:700;color:#1a1a2e}
 .progress-dot{width:8px;height:8px;border-radius:50%;background:#4a6cf7;animation:pulse 1.2s ease-in-out infinite}
 .progress-text{font-size:13px;color:#4a6cf7;font-weight:500}
 @keyframes pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
+
+/* Modal */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.35);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.modal-box{background:#fff;border-radius:14px;padding:24px;width:340px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.modal-title{font-size:16px;font-weight:600;color:#1a1a2e;margin-bottom:16px;text-align:center}
+.modal-body{margin-bottom:14px}
+.modal-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.modal-row label{font-size:13px;color:#666;min-width:36px}
+.modal-row input{width:60px;padding:7px;border:1px solid #ddd;border-radius:6px;font-size:13px;text-align:center;outline:none}
+.modal-row input:focus{border-color:#4a6cf7}
+.modal-grid{display:grid;gap:4px;margin-bottom:16px;justify-content:center}
+.modal-grid input{width:48px;height:36px;border:1px solid #ddd;border-radius:5px;text-align:center;font-size:13px;outline:none;padding:0}
+.modal-grid input:focus{border-color:#4a6cf7;box-shadow:0 0 0 2px rgba(74,108,247,.1)}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end}
 .error{color:#ef4444;background:#fef2f2;border:1px solid #fecaca;padding:12px;border-radius:8px;text-align:center;font-size:13px}
 .ai-box{background:#f0f7ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px 18px;margin-top:4px}
 .ai-heading{font-size:15px;font-weight:600;color:#1e40af;margin:10px 0 6px}

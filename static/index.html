@@ -61,9 +61,9 @@
     <div class="symbol-panel" id="symbol-panel" style="display:none">
       <div class="symbol-group">
         <span class="symbol-label">矩阵格式</span>
-        <button class="sym-btn" data-sym="[1, 2; 3, 4]">矩阵 [a, b; c, d]</button>
-        <button class="sym-btn" data-sym="(1, 2; 3, 4)">矩阵 (a, b; c, d)</button>
-        <button class="sym-btn" data-sym="| 1, 2; 3, 4 |">行列式 |a,b;c,d|</button>
+        <button class="sym-btn" data-action="matrix-bracket" data-format="bracket">矩阵 [ ]</button>
+        <button class="sym-btn" data-action="matrix-paren" data-format="paren">矩阵 ( )</button>
+        <button class="sym-btn" data-action="det" data-format="det">行列式</button>
       </div>
       <div class="symbol-group">
         <span class="symbol-label">运算符号</span>
@@ -112,6 +112,28 @@
     <h2 id="result-title">结果</h2>
     <div id="result-content"></div>
   </section>
+
+  <!-- 矩阵生成弹窗 -->
+  <div class="modal-overlay" id="matrix-modal" style="display:none">
+    <div class="modal-box">
+      <div class="modal-title" id="modal-title">生成矩阵</div>
+      <div class="modal-body">
+        <div class="modal-row">
+          <label>行数</label>
+          <input type="number" id="modal-rows" min="1" max="8" value="2">
+        </div>
+        <div class="modal-row" id="modal-cols-row">
+          <label>列数</label>
+          <input type="number" id="modal-cols" min="1" max="8" value="2">
+        </div>
+      </div>
+      <div class="modal-grid" id="modal-grid"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modal-cancel">取消</button>
+        <button class="btn btn-primary" id="modal-ok">插入</button>
+      </div>
+    </div>
+  </div>
 </div>
 <script src="/static/script.js"></script>
 </body>

@@ -140,19 +140,86 @@ document.addEventListener('DOMContentLoaded', () => {
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
   });
 
-  // Insert symbol into textarea
-  document.querySelectorAll('.sym-btn').forEach(btn => {
+  // Regular symbol insert (non-matrix)
+  document.querySelectorAll('.sym-btn[data-sym]').forEach(btn => {
     btn.addEventListener('click', () => {
       const textarea = document.getElementById('ai-input');
       const sym = btn.dataset.sym;
       const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
       const text = textarea.value;
-      textarea.value = text.substring(0, start) + sym + text.substring(end);
+      textarea.value = text.substring(0, start) + sym + text.substring(start);
       textarea.focus();
-      const newPos = start + sym.length;
-      textarea.setSelectionRange(newPos, newPos);
+      textarea.setSelectionRange(start + sym.length, start + sym.length);
     });
+  });
+
+  // Matrix modal
+  const modal = document.getElementById('matrix-modal');
+  let modalFormat = 'bracket';
+
+  document.querySelectorAll('.sym-btn[data-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      modalFormat = btn.dataset.format;
+      const isDet = modalFormat === 'det';
+      document.getElementById('modal-title').textContent = isDet ? '生成行列式' : '生成矩阵';
+      document.getElementById('modal-cols-row').style.display = isDet ? 'none' : 'flex';
+      buildModalGrid();
+      modal.style.display = 'flex';
+    });
+  });
+
+  // Rebuild modal grid when rows/cols change
+  ['modal-rows', 'modal-cols'].forEach(id => {
+    document.getElementById(id).addEventListener('input', buildModalGrid);
+  });
+
+  function buildModalGrid() {
+    const r = parseInt(document.getElementById('modal-rows').value) || 2;
+    const c = modalFormat === 'det' ? r : (parseInt(document.getElementById('modal-cols').value) || 2);
+    const grid = document.getElementById('modal-grid');
+    grid.innerHTML = '';
+    grid.style.gridTemplateColumns = `repeat(${c}, 48px)`;
+    for (let i = 0; i < r * c; i++) {
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.value = '0';
+      inp.addEventListener('focus', () => { if (inp.value === '0') inp.value = ''; });
+      inp.addEventListener('blur', () => { if (!inp.value.trim()) inp.value = '0'; });
+      grid.appendChild(inp);
+    }
+  }
+
+  document.getElementById('modal-cancel').addEventListener('click', () => { modal.style.display = 'none'; });
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+
+  document.getElementById('modal-ok').addEventListener('click', () => {
+    const r = parseInt(document.getElementById('modal-rows').value) || 2;
+    const c = modalFormat === 'det' ? r : (parseInt(document.getElementById('modal-cols').value) || 2);
+    const inputs = document.getElementById('modal-grid').querySelectorAll('input');
+    // Build matrix string
+    let rows = [];
+    for (let i = 0; i < r; i++) {
+      let cells = [];
+      for (let j = 0; j < c; j++) {
+        cells.push(inputs[i * c + j].value.trim() || '0');
+      }
+      rows.push(cells.join(', '));
+    }
+    let str;
+    if (modalFormat === 'det') {
+      str = '|' + rows.join('; ') + '|';
+    } else if (modalFormat === 'paren') {
+      str = '(' + rows.join('; ') + ')';
+    } else {
+      str = '[' + rows.join('; ') + ']';
+    }
+    // Insert into textarea
+    const textarea = document.getElementById('ai-input');
+    const start = textarea.selectionStart;
+    const text = textarea.value;
+    textarea.value = text.substring(0, start) + str + text.substring(start);
+    textarea.focus();
+    textarea.setSelectionRange(start + str.length, start + str.length);
+    modal.style.display = 'none';
   });
 
   ['rows', 'cols'].forEach(id => {
