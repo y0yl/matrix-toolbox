@@ -952,5 +952,6 @@ const server = http.createServer((req, res) => {
   res.writeHead(404); res.end('Not found');
 });
 
-const PORT = 6130;
-server.listen(PORT, '0.0.0.0', () => console.log(`Matrix Toolbox running on :${PORT}`));
+const PORT = process.env.PORT || 6130;
+const BIND = process.env.BIND || '0.0.0.0';
+server.listen(PORT, BIND, () => console.log(`Matrix Toolbox running on ${BIND}:${PORT}`));

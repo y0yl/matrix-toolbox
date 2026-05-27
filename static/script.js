@@ -287,8 +287,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       try {
         // 1. Submit AI task, get reqId
-        const submitResp = await fetch('/api/calc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        const submitData = await submitResp.json();
+        const submitResp = await (typeof _0xEnc !== 'undefined' ? _0xEnc.fetch(body) : fetch('/api/calc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+        const submitData = typeof _0xEnc !== 'undefined' ? submitResp : await submitResp.json();
         if (submitData.error) throw new Error(submitData.error);
         const reqId = submitData.reqId;
 
@@ -316,8 +316,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      const resp = await fetch('/api/calc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const data = await resp.json();
+      const resp = await (typeof _0xEnc !== 'undefined' ? _0xEnc.fetch(body) : fetch('/api/calc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+      const data = typeof _0xEnc !== 'undefined' ? resp : await resp.json();
       if (data.error) { resultContent.innerHTML = `<div class="error">${data.error}</div>`; resultTitle.textContent = '错误'; }
       else { renderResult(data); }
       resultSection.style.display = 'block';
