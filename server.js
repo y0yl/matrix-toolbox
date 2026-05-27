@@ -1,7 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { exec } = require('child_process');
 
 // ============== Fraction ==============
 class Fraction {
@@ -33,6 +33,174 @@ function gcd(a, b) {
 
 const F0 = () => new Fraction(0);
 const F1 = () => new Fraction(1);
+
+// ============== Symbolic Expressions ==============
+class SymExpr {
+  constructor(terms = {}) { this.terms = terms; } // { '': coeff, 'λ': coeff, 'λ²': coeff, ... }
+
+  static num(n) { return new SymExpr({ '': Number(n) }); }
+  static param(p) { return new SymExpr({ [p]: 1 }); }
+  static zero() { return new SymExpr({}); }
+
+  isZero() { return Object.keys(this.terms).length === 0 || Object.values(this.terms).every(v => v === 0); }
+  isNum() { return Object.keys(this.terms).length === 0 || (Object.keys(this.terms).length === 1 && Object.keys(this.terms)[0] === ''); }
+  toNum() { return this.isNum() ? (this.terms[''] || 0) : NaN; }
+
+  add(other) {
+    const r = { ...this.terms };
+    for (const [k, v] of Object.entries(other.terms)) r[k] = (r[k] || 0) + v;
+    return new SymExpr(r).simplify();
+  }
+  sub(other) {
+    const r = { ...this.terms };
+    for (const [k, v] of Object.entries(other.terms)) r[k] = (r[k] || 0) - v;
+    return new SymExpr(r).simplify();
+  }
+  mul(other) {
+    const r = {};
+    for (const [k1, v1] of Object.entries(this.terms)) {
+      for (const [k2, v2] of Object.entries(other.terms)) {
+        const key = SymExpr._mulKeys(k1, k2);
+        r[key] = (r[key] || 0) + v1 * v2;
+      }
+    }
+    return new SymExpr(r).simplify();
+  }
+  neg() {
+    const r = {};
+    for (const [k, v] of Object.entries(this.terms)) r[k] = -v;
+    return new SymExpr(r);
+  }
+
+  simplify() {
+    const r = {};
+    for (const [k, v] of Object.entries(this.terms)) {
+      if (v !== 0) r[k] = v;
+    }
+    return new SymExpr(r);
+  }
+
+  static _mulKeys(k1, k2) {
+    if (!k1) return k2;
+    if (!k2) return k1;
+    // Parse base^exp from key
+    const parse = k => {
+      const m = k.match(/^(.+?)(\d+)$/);
+      return m ? [m[1], parseInt(m[2])] : [k, 1];
+    };
+    const [b1, e1] = parse(k1);
+    const [b2, e2] = parse(k2);
+    if (b1 !== b2) return k1 + '*' + k2; // different params: ab
+    const e = e1 + e2;
+    return e === 1 ? b1 : b1 + e;
+  }
+
+  toString() {
+    if (this.isZero()) return '0';
+    const parts = [];
+    for (const [k, v] of Object.entries(this.terms)) {
+      if (v === 0) continue;
+      if (!k) { parts.push(v > 0 ? `+${v}` : `${v}`); }
+      else if (v === 1) { parts.push(`+${k}`); }
+      else if (v === -1) { parts.push(`-${k}`); }
+      else { parts.push(v > 0 ? `+${v}${k}` : `${v}${k}`); }
+    }
+    const s = parts.join('') || '0';
+    return s.startsWith('+') ? s.slice(1) : s;
+  }
+
+  toJSON() { return this.toString(); }
+}
+
+class SymFrac {
+  constructor(num, den) {
+    this.num = num instanceof SymExpr ? num : SymExpr.num(num);
+    this.den = den instanceof SymExpr ? den : SymExpr.num(den || 1);
+  }
+
+  isZero() { return this.num.isZero(); }
+  isNum() { return this.num.isNum() && this.den.isNum(); }
+
+  add(f) { return new SymFrac(this.num.mul(f.den).add(f.num.mul(this.den)), this.den.mul(f.den)).simplify(); }
+  sub(f) { return new SymFrac(this.num.mul(f.den).sub(f.num.mul(this.den)), this.den.mul(f.den)).simplify(); }
+  mul(f) { return new SymFrac(this.num.mul(f.num), this.den.mul(f.den)).simplify(); }
+  div(f) { return new SymFrac(this.num.mul(f.den), this.den.mul(f.num)).simplify(); }
+  neg() { return new SymFrac(this.num.neg(), this.den); }
+
+  simplify() {
+    // Zero numerator -> 0
+    if (this.num.isZero()) return new SymFrac(SymExpr.zero(), SymExpr.num(1));
+    // If both numeric, reduce to simple fraction
+    if (this.isNum()) {
+      const n = this.num.toNum(), d = this.den.toNum();
+      if (d === 0) return new SymFrac(SymExpr.zero(), SymExpr.num(1));
+      if (n === 0) return new SymFrac(SymExpr.zero(), SymExpr.num(1));
+      const g = gcd(BigInt(Math.round(n)), BigInt(Math.round(d)));
+      return new SymFrac(SymExpr.num(Number(BigInt(Math.round(n)) / g)), SymExpr.num(Number(BigInt(Math.round(d)) / g)));
+    }
+    // Check if num and den are identical -> 1
+    if (JSON.stringify(this.num.terms) === JSON.stringify(this.den.terms)) {
+      return new SymFrac(SymExpr.num(1), SymExpr.num(1));
+    }
+    return this;
+  }
+
+  toString() {
+    if (this.num.isZero()) return '0';
+    const ns = this.num.toString();
+    const ds = this.den.toString();
+    if (ds === '1') return ns;
+    if (this.den.isNum() && this.num.isNum()) {
+      const n = this.num.toNum(), d = this.den.toNum();
+      if (d < 0) return `${-n}/${-d}`;
+      return `${n}/${d}`;
+    }
+    // Wrap complex expressions in parens
+    const nStr = Object.keys(this.num.terms).length > 1 ? `(${ns})` : ns;
+    const dStr = Object.keys(this.den.terms).length > 1 ? `(${ds})` : ds;
+    return `${nStr}/${dStr}`;
+  }
+
+  toJSON() { return this.toString(); }
+}
+
+function parseSymExpr(s) {
+  s = String(s).trim();
+  if (!s || s === '0') return SymExpr.zero();
+  if (s === '1') return SymExpr.num(1);
+  if (s === '-1') return SymExpr.num(-1);
+  const terms = {};
+  const re = /[+-]?[^+-]+/g;
+  let m;
+  while ((m = re.exec(s))) {
+    let tok = m[0].trim();
+    if (!tok) continue;
+    let sign = 1;
+    if (tok.startsWith('+')) { sign = 1; tok = tok.slice(1); }
+    else if (tok.startsWith('-')) { sign = -1; tok = tok.slice(1); }
+    const numMatch = tok.match(/^(\d*\.?\d*)(.*)/);
+    if (!numMatch) continue;
+    const coeff = numMatch[1] === '' ? 1 : Number(numMatch[1]);
+    const param = numMatch[2] || '';
+    terms[param] = (terms[param] || 0) + sign * coeff;
+  }
+  return new SymExpr(terms).simplify();
+}
+
+function parseSymFrac(s) {
+  s = String(s).trim();
+  if (!s || s === '0') return new SymFrac(SymExpr.zero(), SymExpr.num(1));
+  // a/b form
+  const divMatch = s.match(/^(.+)\/(.+)$/);
+  if (divMatch) {
+    const num = parseSymExpr(divMatch[1]);
+    const den = parseSymExpr(divMatch[2]);
+    return new SymFrac(num, den);
+  }
+  return new SymFrac(parseSymExpr(s), SymExpr.num(1));
+}
+
+function isNumericFrac(f) { return f.isNum(); }
 
 // ============== Matrix utils ==============
 function createMatrix(rows, cols, fill) {
@@ -488,8 +656,175 @@ const PROOFS = {
   }},
 };
 
+// ============== Parametric Matrix Operations ==============
+function paramMatRREF(m) {
+  const rows = m.length, cols = m[0].length;
+  const data = m.map(r => [...r]);
+  const steps = [{ index: 1, desc: '初始矩阵', matrix: data.map(r => r.map(f => f.toJSON())) }];
+  let pivotRow = 0;
+  const cases = [];
+
+  for (let col = 0; col < cols && pivotRow < rows; col++) {
+    // Find a non-zero pivot
+    let best = -1;
+    for (let row = pivotRow; row < rows; row++) {
+      if (!data[row][col].isZero()) { best = row; break; }
+    }
+    if (best === -1) continue;
+
+    // Swap
+    if (best !== pivotRow) {
+      [data[pivotRow], data[best]] = [data[best], data[pivotRow]];
+      steps.push({ index: steps.length + 1, desc: `交换第${pivotRow + 1}行和第${best + 1}行`, matrix: data.map(r => r.map(f => f.toJSON())) });
+    }
+
+    const pivot = data[pivotRow][col];
+    // Scale pivot to 1
+    if (pivot.toString() !== '1') {
+      const inv = new SymFrac(pivot.den, pivot.num);
+      for (let j = 0; j < cols; j++) data[pivotRow][j] = data[pivotRow][j].mul(inv);
+      steps.push({ index: steps.length + 1, desc: `第${pivotRow + 1}行 × (${inv.toString()}) 使主元为1`, matrix: data.map(r => r.map(f => f.toJSON())) });
+    }
+
+    // Eliminate column
+    for (let row = 0; row < rows; row++) {
+      if (row === pivotRow) continue;
+      const factor = data[row][col];
+      if (factor.isZero()) continue;
+      for (let j = 0; j < cols; j++) {
+        data[row][j] = data[row][j].sub(factor.mul(data[pivotRow][j]));
+      }
+      steps.push({ index: steps.length + 1, desc: `第${row + 1}行 - (${factor.toString()})×第${pivotRow + 1}行`, matrix: data.map(r => r.map(f => f.toJSON())) });
+    }
+    pivotRow++;
+  }
+
+  return { steps, result: data.map(r => r.map(f => f.toJSON())), cases };
+}
+
+function paramMatREF(m) {
+  const rows = m.length, cols = m[0].length;
+  const data = m.map(r => [...r]);
+  const steps = [{ index: 1, desc: '初始矩阵', matrix: data.map(r => r.map(f => f.toJSON())) }];
+  let pivotRow = 0;
+
+  for (let col = 0; col < cols && pivotRow < rows; col++) {
+    let best = -1;
+    for (let row = pivotRow; row < rows; row++) {
+      if (!data[row][col].isZero()) { best = row; break; }
+    }
+    if (best === -1) continue;
+
+    if (best !== pivotRow) {
+      [data[pivotRow], data[best]] = [data[best], data[pivotRow]];
+      steps.push({ index: steps.length + 1, desc: `交换第${pivotRow + 1}行和第${best + 1}行`, matrix: data.map(r => r.map(f => f.toJSON())) });
+    }
+
+    const pivot = data[pivotRow][col];
+    for (let row = pivotRow + 1; row < rows; row++) {
+      const factor = data[row][col];
+      if (factor.isZero()) continue;
+      const ratio = factor.div(pivot);
+      for (let j = col; j < cols; j++) {
+        data[row][j] = data[row][j].sub(ratio.mul(data[pivotRow][j]));
+      }
+      steps.push({ index: steps.length + 1, desc: `第${row + 1}行 - (${ratio.toString()})×第${pivotRow + 1}行`, matrix: data.map(r => r.map(f => f.toJSON())) });
+    }
+    pivotRow++;
+  }
+
+  return { steps, result: data.map(r => r.map(f => f.toJSON())) };
+}
+
+function paramMatDet(m) {
+  const n = m.length;
+  if (n !== m[0].length) return { error: '行列式要求方阵' };
+  const data = m.map(r => [...r]);
+  const steps = [{ index: 1, desc: '初始矩阵', matrix: data.map(r => r.map(f => f.toJSON())) }];
+  let swapCount = 0;
+
+  for (let i = 0; i < n; i++) {
+    let best = -1;
+    for (let row = i; row < n; row++) {
+      if (!data[row][i].isZero()) { best = row; break; }
+    }
+    if (best === -1) return { steps: [...steps, { index: steps.length + 1, desc: '存在全零列，行列式 = 0', matrix: data.map(r => r.map(f => f.toJSON())) }], result: SymExpr.zero().toJSON() };
+    if (best !== i) {
+      [data[i], data[best]] = [data[best], data[i]];
+      swapCount++;
+      steps.push({ index: steps.length + 1, desc: `交换第${i + 1}行和第${best + 1}行`, matrix: data.map(r => r.map(f => f.toJSON())) });
+    }
+    const pivot = data[i][i];
+    for (let row = i + 1; row < n; row++) {
+      const factor = data[row][i];
+      if (factor.isZero()) continue;
+      const ratio = factor.div(pivot);
+      for (let j = i; j < n; j++) {
+        data[row][j] = data[row][j].sub(ratio.mul(data[i][j]));
+      }
+      steps.push({ index: steps.length + 1, desc: `第${row + 1}行 - (${ratio.toString()})×第${i + 1}行`, matrix: data.map(r => r.map(f => f.toJSON())) });
+    }
+  }
+
+  let det = new SymFrac(SymExpr.num(1), SymExpr.num(1));
+  for (let i = 0; i < n; i++) det = det.mul(data[i][i]);
+  if (swapCount % 2 !== 0) det = det.neg();
+
+  steps.push({ index: steps.length + 1, desc: `对角线乘积 = ${det.simplify().toString()}${swapCount % 2 ? ' (变号)' : ''}`, matrix: data.map(r => r.map(f => f.toJSON())) });
+  return { steps, result: det.simplify().toJSON() };
+}
+
+function paramMatRank(m) {
+  const { steps, result } = paramMatREF(m);
+  let rank = 0;
+  for (const row of result) {
+    const isZero = row.every(cell => String(cell) === '0');
+    if (!isZero) rank++;
+  }
+  return { steps, result: rank };
+}
+
 // ============== AI Solver ==============
-async function aiSolve(problem) {
+const MAX_CONCURRENT_AI = 3;
+let activeAI = 0;
+const aiQueue = [];
+const aiPending = new Map(); // id -> true
+const aiResults = new Map(); // id -> { result, expiresAt }
+let aiReqCounter = 0;
+
+function runAI(prompt, reqId) {
+  return new Promise((resolve) => {
+    const go = () => {
+      aiPending.delete(reqId);
+      activeAI++;
+      exec(`openclaw agent --agent main --message ${JSON.stringify(prompt)} --json`, { timeout: 60000 }, (err, stdout) => {
+        activeAI--;
+        if (aiQueue.length > 0) aiQueue.shift()();
+        let result;
+        if (err) {
+          result = { answer: null, isLinearAlgebra: false, message: 'AI服务暂时不可用:' + err.message };
+        } else {
+          try {
+            const data = JSON.parse(stdout);
+            const answer = data.result?.payloads?.[0]?.text || '无法获取回答';
+            const isLA = !answer.includes('NOT_LA');
+            result = { answer: isLA ? answer : null, isLinearAlgebra: isLA, message: isLA ? null : '该问题不属于线性代数范畴' };
+          } catch (e) {
+            result = { answer: null, isLinearAlgebra: false, message: 'AI返回结果解析失败' };
+          }
+        }
+        // Store result for polling, expire after 30s
+        aiResults.set(reqId, { result, expiresAt: Date.now() + 30000 });
+        setTimeout(() => aiResults.delete(reqId), 30000);
+        resolve(result);
+      });
+    };
+    if (activeAI < MAX_CONCURRENT_AI) { go(); }
+    else { aiPending.set(reqId, true); aiQueue.push(go); }
+  });
+}
+
+function aiSolve(problem) {
   const prompt = `你是一个线性代数专家。请判断以下问题是否属于线性代数范畴（包括矩阵、行列式、向量空间、线性方程组、特征值、线性变换、内积空间等）。
 如果是，请直接给出关键解题步骤（不要写思考过程，只写步骤），用中文回答，步骤用编号。
 所有数学公式、矩阵、向量必须用LaTeX格式书写：
@@ -498,18 +833,12 @@ async function aiSolve(problem) {
 - 行列式用 $\\begin{vmatrix} ... \\end{vmatrix}$
 - 分数用 $\\frac{a}{b}$
 - 下标用 $a_{ij}$，上标用 $A^T$, $A^{-1}$
-如果不是线性代数问题，请直接回答“NOT_LA”。
+如果不是线性代数问题，请直接回答"NOT_LA"。
 
 问题：${problem}`;
-  try {
-    const result = execSync(`openclaw agent --agent main --message ${JSON.stringify(prompt)} --json`, { timeout: 60000, encoding: 'utf-8' });
-    const data = JSON.parse(result);
-    const answer = data.result?.payloads?.[0]?.text || '无法获取回答';
-    const isLA = !answer.includes('NOT_LA');
-    return { answer: isLA ? answer : null, isLinearAlgebra: isLA, message: isLA ? null : '该问题不属于线性代数范畴' };
-  } catch (err) {
-    return { answer: null, isLinearAlgebra: false, message: 'AI服务暂时不可用:' + err.message };
-  }
+  const reqId = ++aiReqCounter;
+  runAI(prompt, reqId); // fire and forget, result stored in aiResults
+  return reqId;
 }
 
 // ============== Handler ==============
@@ -526,6 +855,25 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url.startsWith('/static/')) {
     const fp = path.join(__dirname, req.url); const ext = path.extname(fp);
     fs.readFile(fp, (e, d) => { if (e) { res.writeHead(404); res.end(); return; } res.writeHead(200, { 'Content-Type': { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript' }[ext] || 'text/plain' }); res.end(d); }); return;
+  }
+
+  if (req.method === 'GET' && req.url.startsWith('/api/ai-queue')) {
+    const url = new URL(req.url, 'http://localhost');
+    const id = Number(url.searchParams.get('id'));
+    const pending = Array.from(aiPending.keys());
+    const pos = pending.indexOf(id);
+    const done = aiResults.has(id);
+    const data = {
+      active: activeAI,
+      queued: pending.size,
+      position: pos === -1 ? 0 : pos + 1,
+      done,
+      result: done ? aiResults.get(id).result : null
+    };
+    if (done) aiResults.delete(id);
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify(data));
+    return;
   }
 
   if (req.method === 'POST' && req.url === '/api/calc') {
@@ -555,7 +903,45 @@ const server = http.createServer((req, res) => {
           case 'cofactor': { const r = matCofactor(m); response = { steps: r.steps, result: r.result ? matToJSON(r.result) : null, error: r.error }; break; }
           case 'eigen': { const r = matEigen(m); response = r.error ? { error: r.error } : { steps: r.steps, eigenvalues: r.result.eigenvalues, eigenvectors: r.result.eigenvectors }; break; }
           case 'proof': { const { proofId } = input; const proof = PROOFS[proofId]; if (!proof) { response = { error: '未知证明题' }; break; } const k = scalar ? parseNum(scalar) : F1(); const r = proof.prove(m, m2, k); response = { steps: r.steps, conclusion: r.conclusion, proved: r.proved, proofName: proof.name }; break; }
-          case 'ai': { const { text } = input; const r = await aiSolve(text); response = { steps: r.isLinearAlgebra ? [{ index: 1, desc: r.answer }] : [], conclusion: r.isLinearAlgebra ? null : r.message, isLinearAlgebra: r.isLinearAlgebra }; break; }
+          // Parametric operations
+          case 'param-rref': {
+            const { paramMatrix } = input;
+            if (!paramMatrix) { response = { error: '缺少参数矩阵' }; break; }
+            const pm = paramMatrix.map(row => row.map(cell => parseSymFrac(cell)));
+            const r = paramMatRREF(pm);
+            response = { steps: r.steps, result: r.result };
+            break;
+          }
+          case 'param-ref': {
+            const { paramMatrix } = input;
+            if (!paramMatrix) { response = { error: '缺少参数矩阵' }; break; }
+            const pm = paramMatrix.map(row => row.map(cell => parseSymFrac(cell)));
+            const r = paramMatREF(pm);
+            response = { steps: r.steps, result: r.result };
+            break;
+          }
+          case 'param-det': {
+            const { paramMatrix } = input;
+            if (!paramMatrix) { response = { error: '缺少参数矩阵' }; break; }
+            const pm = paramMatrix.map(row => row.map(cell => parseSymFrac(cell)));
+            const r = paramMatDet(pm);
+            response = { steps: r.steps, result: r.result, error: r.error };
+            break;
+          }
+          case 'param-rank': {
+            const { paramMatrix } = input;
+            if (!paramMatrix) { response = { error: '缺少参数矩阵' }; break; }
+            const pm = paramMatrix.map(row => row.map(cell => parseSymFrac(cell)));
+            const r = paramMatRank(pm);
+            response = { steps: r.steps, result: r.result };
+            break;
+          }
+          case 'ai': {
+            const { text } = input;
+            const reqId = aiSolve(text);
+            response = { reqId, pending: true };
+            break;
+          }
           default: response = { error: '未知操作' };
         }
         res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(response));

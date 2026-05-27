@@ -35,6 +35,12 @@ document.addEventListener('DOMContentLoaded', () => {
     ],
     ai: [
       { id: 'ai-solve', name: 'AI 线性代数解题', icon: '🤖', isAI: true },
+    ],
+    param: [
+      { id: 'param-rref', name: '参数行最简形', icon: '📐', isParam: true },
+      { id: 'param-ref', name: '参数行阶梯形', icon: '📋', isParam: true },
+      { id: 'param-det', name: '参数行列式', icon: '📏', isParam: true, needSquare: true },
+      { id: 'param-rank', name: '参数秩', icon: '📊', isParam: true },
     ]
   };
 
@@ -77,13 +83,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const allOps = Object.values(OPS).flat();
     const op = allOps.find(o => o.id === currentOp);
     const isAI = op?.isAI;
-    sectionA.style.display = isAI ? 'none' : 'block';
+    const isParam = op?.isParam;
+    sectionA.style.display = (isAI || isParam) ? 'none' : 'block';
     sectionB.style.display = op?.needB ? 'block' : 'none';
     sectionScalar.style.display = op?.needScalar ? 'block' : 'none';
     sectionAI.style.display = isAI ? 'block' : 'none';
+    document.getElementById('section-param').style.display = isParam ? 'block' : 'none';
     // 切换按钮文字
     const btnCalc = document.getElementById('btn-calc');
-    btnCalc.textContent = isAI ? '开始解题' : '计算';
+    btnCalc.textContent = isAI ? '开始解题' : (isParam ? '开始化简' : '计算');
     // 显示/隐藏符号面板按钮
     document.getElementById('btn-symbols').style.display = isAI ? 'inline-block' : 'none';
     if (!isAI) document.getElementById('symbol-panel').style.display = 'none';
@@ -238,12 +246,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const allOps = Object.values(OPS).flat();
     const opDef = allOps.find(o => o.id === currentOp);
     const isAI = opDef?.isAI;
+    const isParam = opDef?.isParam;
 
     let body;
     if (isAI) {
       const text = document.getElementById('ai-input').value.trim();
       if (!text) { alert('请输入问题'); return; }
       body = { op: 'ai', text };
+    } else if (opDef?.isParam) {
+      const raw = document.getElementById('param-input').value.trim();
+      if (!raw) { alert('请输入参数矩阵'); return; }
+      // Parse: rows separated by ; or newline, cells by ,
+      const rows = raw.split(/[;\n]+/).map(r => r.trim()).filter(Boolean);
+      const paramMatrix = rows.map(row => row.split(',').map(cell => cell.trim()));
+      const r = paramMatrix.length, c = Math.max(...paramMatrix.map(row => row.length));
+      // Normalize: ensure all rows have same number of columns
+      paramMatrix.forEach(row => { while (row.length < c) row.push('0'); });
+      body = { op: currentOp, paramMatrix, rows: r, cols: c };
     } else {
       const rows = parseInt(document.getElementById('rows').value) || 3;
       const cols = parseInt(document.getElementById('cols').value) || 3;
@@ -260,22 +279,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const btn = document.getElementById('btn-calc');
     const progress = document.getElementById('progress');
-    btn.disabled = true; btn.textContent = isAI ? '解题中...' : '计算中...';
+    btn.disabled = true; btn.textContent = isAI ? '解题中...' : (isParam ? '化简中...' : '计算中...');
+
     if (isAI) {
       progress.style.display = 'flex';
-      progress.querySelector('.progress-text').textContent = 'AI 正在思考...';
+      progress.querySelector('.progress-text').textContent = '提交中...';
+
+      try {
+        // 1. Submit AI task, get reqId
+        const submitResp = await fetch('/api/calc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const submitData = await submitResp.json();
+        if (submitData.error) throw new Error(submitData.error);
+        const reqId = submitData.reqId;
+
+        // 2. Poll queue position until result is ready
+        let result = null;
+        while (true) {
+          await new Promise(r => setTimeout(r, 1500));
+          const pollResp = await fetch(`/api/ai-queue?id=${reqId}`);
+          const status = await pollResp.json();
+          const pt = progress.querySelector('.progress-text');
+          if (status.done) { result = status.result; break; }
+          if (status.position > 0) pt.textContent = `排队中，前面还有 ${status.position} 人...`;
+          else pt.textContent = 'AI 正在思考...';
+        }
+
+        // 3. Render result
+        progress.querySelector('.progress-text').textContent = '正在渲染结果...';
+        if (result.error) { resultContent.innerHTML = `<div class="error">${result.error}</div>`; resultTitle.textContent = '错误'; }
+        else { result.steps = result.steps || []; renderResult(result); }
+        resultSection.style.display = 'block';
+        resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (err) { resultContent.innerHTML = `<div class="error">请求失败：${err.message}</div>`; resultSection.style.display = 'block'; }
+      finally { btn.disabled = false; btn.textContent = '开始解题'; progress.style.display = 'none'; }
+      return;
     }
 
     try {
       const resp = await fetch('/api/calc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await resp.json();
-      if (isAI) progress.querySelector('.progress-text').textContent = '正在渲染结果...';
       if (data.error) { resultContent.innerHTML = `<div class="error">${data.error}</div>`; resultTitle.textContent = '错误'; }
       else { renderResult(data); }
       resultSection.style.display = 'block';
       resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) { resultContent.innerHTML = `<div class="error">请求失败：${err.message}</div>`; resultSection.style.display = 'block'; }
-    finally { btn.disabled = false; btn.textContent = isAI ? '开始解题' : '计算'; progress.style.display = 'none'; }
+    finally { btn.disabled = false; btn.textContent = isAI ? '开始解题' : (isParam ? '开始化简' : '计算'); progress.style.display = 'none'; }
   });
 
   // Render
@@ -283,6 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function formatEntry(e) {
     if (!e) return '0';
+    if (typeof e === 'string') return e; // symbolic expression
     const c = e.const || e, p = e.coeff || { num: 0, den: 1 };
     if (c.num === 0 && p.num === 0) return '0';
     if (p.num === 0) return fracStr(c);
